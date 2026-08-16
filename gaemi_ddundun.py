@@ -402,7 +402,22 @@ def find_swing_points(values, order=5):
     return swings
 
 
-def detect_divergence(dates, closes, obv, rsi, order=5):
+def find_trailing_extreme(values, window=15):
+    """마지막 window개 구간에서의 최저/최고점 - find_swing_points와 달리 '이후' 구간의
+    확인(반등/반락)을 요구하지 않는다. 아직 반등하지 않은 방금 만든 저점/고점을 놓치지
+    않기 위한 보조 판단(스윙 저점은 정의상 '반등해야' 국소최소로 확인되므로, 반등 전날까지의
+    데이터만 보는 상황 - 다이버전스 사전탐지, 사건 직전 시점 등 - 에서는 find_swing_points만으로
+    가장 최근/가장 중요한 저점·고점을 아예 못 찾는 경우가 생긴다)."""
+    n = len(values)
+    start = max(0, n - window)
+    seg = values[start:]
+    min_v, max_v = min(seg), max(seg)
+    min_i = start + seg.index(min_v)
+    max_i = start + seg.index(max_v)
+    return (min_i, min_v), (max_i, max_v)
+
+
+def detect_divergence(dates, closes, obv, rsi, order=5, trailing_window=15):
     """가장 최근의 유의미한 스윙 저점 쌍 또는 고점 쌍(둘 중 더 최근에 발생한 쪽)을 비교해
     가격 vs 거래량(OBV)/모멘텀(RSI) 다이버전스 여부를 판단."""
     swings = find_swing_points(closes, order=order)
@@ -414,6 +429,16 @@ def detect_divergence(dates, closes, obv, rsi, order=5):
         candidates.append(("bullish_check", lows[-2], lows[-1]))
     if len(highs) >= 2:
         candidates.append(("bearish_check", highs[-2], highs[-1]))
+
+    # 아직 반등/반락으로 '확인'되지 않은 최근 저점/고점도 후보로 포함 (위 설명 참고) -
+    # 확인된 마지막 스윙과 비교해서, 반등 전이라도 다이버전스를 놓치지 않는다.
+    if len(closes) >= trailing_window:
+        (tmin_i, tmin_v), (tmax_i, tmax_v) = find_trailing_extreme(closes, trailing_window)
+        if lows and tmin_i > lows[-1][0] and tmin_v < lows[-1][1]:
+            candidates.append(("bullish_check", lows[-1], (tmin_i, tmin_v, "low")))
+        if highs and tmax_i > highs[-1][0] and tmax_v > highs[-1][1]:
+            candidates.append(("bearish_check", highs[-1], (tmax_i, tmax_v, "high")))
+
     if not candidates:
         return {"type": None, "signals": {}, "points": None}
 
@@ -708,6 +733,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   {technical_section}
 
+  {event_backtest_section}
+
   {export_corr_section}
 
   <div class="card">
@@ -731,6 +758,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <li>"애널리스트 목표주가 &amp; 선행 밸류에이션"은 KIS API가 아니라 사용자가 증권사 리포트를 보고
         직접 입력한 값입니다. 리포트 발행 시점 기준 데이터라 시간이 지나면 낡을 수 있으니, 표시된
         증권사·시점을 꼭 함께 확인하세요. 목표주가는 해당 증권사의 전망치일 뿐 실현을 보장하지 않습니다.</li>
+      <li>"과거 급등 이벤트 백테스트"의 이벤트는 실제 뉴스/실적 캘린더가 아니라 "하루 등락률+거래량이
+        동시에 크게 튄 날"을 호재의 대리 지표로 삼아 자동 탐지한 것입니다. 표본 수가 적을 수 있고,
+        과거 패턴이 미래에 반복된다는 보장도 없습니다. 참고 지표로만 활용하세요.</li>
     </ul>
   </div>
 
@@ -759,6 +789,13 @@ def fmt_gap(cur, avg):
 
 def fmt_r(r):
     return f"{r:.2f}" if r is not None else "-"
+
+
+def fmt_signed_pct(v):
+    if v is None:
+        return "N/A"
+    sign = "+" if v >= 0 else ""
+    return f"{sign}{v*100:.1f}%"
 
 
 # --------------------------------------------------------------------- 애널리스트 목표주가 (수동 입력)
@@ -968,6 +1005,83 @@ def render_technical_signal_section(daily_bars):
   </div>"""
 
 
+# --------------------------------------------------------------------- 과거 급등 이벤트 백테스트
+# event_backtest.py를 미리 실행해서 만들어둔 event_backtest_<code>.json (같은 폴더)이 있을 때만 표시.
+# "하루 등락률+거래량이 동시에 크게 튄 날"을 호재/실적서프라이즈의 대리 지표로 삼아, 그 이후
+# 수익률 궤적과 사전 다이버전스 여부를 과거 여러 건에 대해 집계한 결과 - 실제 뉴스 캘린더 기반이
+# 아니므로 event_history.json에 확인된 사건이 있으면 라벨만 참고용으로 붙는다.
+
+def load_event_backtest(code):
+    fname = f"event_backtest_{code}.json"
+    if not os.path.exists(fname):
+        return None
+    try:
+        with open(fname, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def render_event_backtest_section(code, daily_bars):
+    result = load_event_backtest(code)
+    if result is None or not result.get("n_events"):
+        return ""
+
+    cur_state_html = "라이브 일봉 데이터가 없어 지금 상태와는 비교할 수 없습니다."
+    if daily_bars and len(daily_bars) >= 40:
+        dates = [b["date"] for b in daily_bars]
+        closes = [b["close"] for b in daily_bars]
+        vols = [b["volume"] for b in daily_bars]
+        obv = compute_obv(closes, vols)
+        rsi = compute_rsi(closes)
+        cur_result = detect_divergence(dates, closes, obv, rsi, order=5)
+        if cur_result["type"] == "bullish":
+            n_confirm = sum(1 for s in cur_result["signals"].values() if s)
+            cur_state_html = (f"지금도 강세 다이버전스 신호가 {'뚜렷하게' if n_confirm == 2 else '약하게'} "
+                               f"포착된 상태입니다 (위 '매수 타이밍 신호' 섹션과 같은 로직).")
+        else:
+            cur_state_html = "지금은 다이버전스 신호가 뚜렷하지 않은 상태입니다."
+
+    agg_rows = []
+    for h, label in [("5", "T+5일"), ("10", "T+10일"), ("20", "T+20일"), ("40", "T+40일")]:
+        a = result["aggregate"].get(h, {})
+        win = fmt_pct(a.get("win_rate")) if a.get("win_rate") is not None else "-"
+        agg_rows.append(
+            f"<tr><td>{label}</td><td>{a.get('n', '-')}</td>"
+            f"<td>{fmt_signed_pct(a.get('mean'))}</td><td>{fmt_signed_pct(a.get('median'))}</td><td>{win}</td></tr>"
+        )
+
+    event_rows = []
+    for e in result["events"][-10:]:
+        label = (f' <span class="corr-badge" style="background:#2a78d6;">{e["label"]}</span>'
+                  if e.get("label") else "")
+        pre = "O" if e.get("pre_divergence_bullish") else "-"
+        event_rows.append(
+            f"<tr><td>{e['date']}{label}</td><td>{fmt_signed_pct(e['ret'])}</td>"
+            f"<td>{e['vol_ratio']:.1f}배</td><td>{pre}</td><td>{fmt_signed_pct(e['forward'].get('20'))}</td></tr>"
+        )
+
+    return f"""
+  <div class="card">
+    <h2>과거 급등 이벤트 백테스트 (호재/실적서프라이즈 대리 지표)</h2>
+    <div class="muted" style="margin-bottom:14px;">하루 {result['min_abs_return']*100:.0f}%+ 상승 &amp;
+    거래량 평균 대비 {result['min_vol_ratio']:.1f}배+ 인 날을 과거 데이터에서 자동으로 찾아 그 이후
+    수익률을 집계했습니다 (event_backtest.py로 갱신). 실제 뉴스 캘린더가 아니라 가격·거래량 패턴 기반
+    대리 지표이니 참고용으로만 활용하세요. 데이터 구간: {result['data_range'][0]} ~ {result['data_range'][1]}
+    · 탐지된 이벤트 {result['n_events']}건 (사전 강세다이버전스 동반: {result['n_pre_divergence_bullish']}건)</div>
+    <table class="corr-table">
+      <tr><th>기간</th><th>표본</th><th>평균수익률</th><th>중앙값</th><th>승률</th></tr>
+      {''.join(agg_rows)}
+    </table>
+    <div class="tech-subtitle">최근 이벤트 (최대 10건, 파란 라벨은 event_history.json에 등록된 실제 뉴스와 날짜가 겹치는 경우)</div>
+    <table class="corr-table">
+      <tr><th>날짜</th><th>당일수익률</th><th>거래량</th><th>사전다이버전스</th><th>T+20수익률</th></tr>
+      {''.join(event_rows)}
+    </table>
+    <div class="tech-explain" style="margin-top:12px;">{cur_state_html}</div>
+  </div>"""
+
+
 def build_report(code, name, quote, annual, bars, daily_bars=None):
     history = build_history(annual, bars)
     n_months = len(history)
@@ -998,6 +1112,7 @@ def build_report(code, name, quote, annual, bars, daily_bars=None):
     export_corr_section = render_export_corr_section(code, bars)
     technical_section = render_technical_signal_section(daily_bars)
     analyst_section = render_analyst_target_section(code, price)
+    event_backtest_section = render_event_backtest_section(code, daily_bars)
 
     from datetime import datetime
     snapshot_date = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -1010,7 +1125,7 @@ def build_report(code, name, quote, annual, bars, daily_bars=None):
         per_gap=fmt_gap(cur_per, avg_per), pbr_gap=fmt_gap(cur_pbr, avg_pbr),
         per_gauge=per_gauge, pbr_gauge=pbr_gauge, per_chart=per_chart, pbr_chart=pbr_chart,
         export_corr_section=export_corr_section, technical_section=technical_section,
-        analyst_section=analyst_section,
+        analyst_section=analyst_section, event_backtest_section=event_backtest_section,
     )
     return html, verdict, composite_pct
 
