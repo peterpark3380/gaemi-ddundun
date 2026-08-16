@@ -28,9 +28,10 @@ HOW TO RUN
 
   수출입데이터 상관관계까지 보려면 같은 폴더에 아래 파일들이 있어야 함
   (customs_export.py로 미리 받아둘 것):
-    005930(삼성전자)/000660(SK하이닉스): customs_dram.json, customs_hbm.json, customs_nand.json
+    005930(삼성전자)/000660(SK하이닉스)/067310(하나마이크론): customs_dram.json, customs_hbm.json, customs_nand.json
     009150(삼성전기): customs_mlcc.json, customs_camera.json
     011070(LG이노텍): customs_camera.json, customs_pcb_c.json
+  (475150 SK이터닉스는 내수 발전·REC 판매가 핵심인 사업모델이라 수출입 품목 매핑을 넣지 않았음)
   파일이 없으면 그 섹션은 자동으로 생략되고 나머지 리포트는 정상 생성된다.
 
   증권사 목표주가/선행 밸류에이션까지 보려면 같은 폴더에 analyst_targets.json이 있어야 함
@@ -66,6 +67,12 @@ STOCK_TO_PRODUCTS = {
     "000660": [("DRAM", "dram"), ("HBM/MCP", "hbm"), ("NAND", "nand")],
     "009150": [("MLCC", "mlcc"), ("카메라모듈", "camera")],
     "011070": [("카메라모듈", "camera"), ("PCB(기타)", "pcb_c")],
+    "067310": [("DRAM", "dram"), ("HBM/MCP", "hbm"), ("NAND", "nand")],  # 하나마이크론: SK하이닉스 등의
+    # 메모리 후공정(패키징/테스트) 외주 물량이 핵심 사업이라, 메모리 수출 물량과 간접적으로 연동될
+    # 것으로 보고 기존 DRAM/HBM/NAND 데이터를 그대로 재사용 (SK하이닉스와 동일 카테고리).
+    # SK이터닉스(475150, 태양광/풍력/ESS/수소 IPP)는 국내 발전·REC 판매가 핵심인 내수 사업모델이라
+    # 관세청 수출입 품목 데이터와 자연스럽게 대응되는 카테고리가 없다고 판단해 넣지 않았음 - 억지로
+    # 끼워맞추느니 생략하는 쪽을 택함 (근거 없으면 빈 리스트/미등록이 맞다는 원칙).
 }
 
 
