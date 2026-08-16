@@ -1,0 +1,738 @@
+{
+  "strt_yymm": "202101",
+  "end_yymm": "202608",
+  "hs_sgn": "8534009000",
+  "label": "pcb_c",
+  "items": [
+    {
+      "balPayments": "95406903",
+      "expDlr": "206587541",
+      "expWgt": "1238611",
+      "hsCode": "8534009000",
+      "impDlr": "111180638",
+      "impWgt": "1846365",
+      "statKor": "기타",
+      "year": "2021.01"
+    },
+    {
+      "balPayments": "102782028",
+      "expDlr": "191828283",
+      "expWgt": "1152619",
+      "hsCode": "8534009000",
+      "impDlr": "89046255",
+      "impWgt": "1387550",
+      "statKor": "기타",
+      "year": "2021.02"
+    },
+    {
+      "balPayments": "111584049",
+      "expDlr": "227514729",
+      "expWgt": "1344968",
+      "hsCode": "8534009000",
+      "impDlr": "115930680",
+      "impWgt": "1745781",
+      "statKor": "기타",
+      "year": "2021.03"
+    },
+    {
+      "balPayments": "108001005",
+      "expDlr": "208193819",
+      "expWgt": "1285438",
+      "hsCode": "8534009000",
+      "impDlr": "100192814",
+      "impWgt": "1569140",
+      "statKor": "기타",
+      "year": "2021.04"
+    },
+    {
+      "balPayments": "91474673",
+      "expDlr": "205458326",
+      "expWgt": "1229154",
+      "hsCode": "8534009000",
+      "impDlr": "113983653",
+      "impWgt": "1617480",
+      "statKor": "기타",
+      "year": "2021.05"
+    },
+    {
+      "balPayments": "111041535",
+      "expDlr": "223236384",
+      "expWgt": "1252942",
+      "hsCode": "8534009000",
+      "impDlr": "112194849",
+      "impWgt": "1585940",
+      "statKor": "기타",
+      "year": "2021.06"
+    },
+    {
+      "balPayments": "123292383",
+      "expDlr": "237257310",
+      "expWgt": "1282003",
+      "hsCode": "8534009000",
+      "impDlr": "113964927",
+      "impWgt": "1652850",
+      "statKor": "기타",
+      "year": "2021.07"
+    },
+    {
+      "balPayments": "126808423",
+      "expDlr": "244301659",
+      "expWgt": "1109565",
+      "hsCode": "8534009000",
+      "impDlr": "117493236",
+      "impWgt": "1524844",
+      "statKor": "기타",
+      "year": "2021.08"
+    },
+    {
+      "balPayments": "125965435",
+      "expDlr": "240520015",
+      "expWgt": "1195464",
+      "hsCode": "8534009000",
+      "impDlr": "114554580",
+      "impWgt": "1500572",
+      "statKor": "기타",
+      "year": "2021.09"
+    },
+    {
+      "balPayments": "125180924",
+      "expDlr": "246122572",
+      "expWgt": "1281650",
+      "hsCode": "8534009000",
+      "impDlr": "120941648",
+      "impWgt": "1611793",
+      "statKor": "기타",
+      "year": "2021.10"
+    },
+    {
+      "balPayments": "104182776",
+      "expDlr": "235198299",
+      "expWgt": "1101174",
+      "hsCode": "8534009000",
+      "impDlr": "131015523",
+      "impWgt": "1714169",
+      "statKor": "기타",
+      "year": "2021.11"
+    },
+    {
+      "balPayments": "126505739",
+      "expDlr": "244844534",
+      "expWgt": "1198680",
+      "hsCode": "8534009000",
+      "impDlr": "118338795",
+      "impWgt": "1457898",
+      "statKor": "기타",
+      "year": "2021.12"
+    },
+    {
+      "balPayments": "1352225873",
+      "expDlr": "2711063471",
+      "expWgt": "14672268",
+      "hsCode": "-",
+      "impDlr": "1358837598",
+      "impWgt": "19214382",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "116319685",
+      "expDlr": "244731720",
+      "expWgt": "1119708",
+      "hsCode": "8534009000",
+      "impDlr": "128412035",
+      "impWgt": "1810781",
+      "statKor": "기타",
+      "year": "2022.01"
+    },
+    {
+      "balPayments": "131978501",
+      "expDlr": "233718355",
+      "expWgt": "1161251",
+      "hsCode": "8534009000",
+      "impDlr": "101739854",
+      "impWgt": "1197983",
+      "statKor": "기타",
+      "year": "2022.02"
+    },
+    {
+      "balPayments": "136311245",
+      "expDlr": "258089155",
+      "expWgt": "1347534",
+      "hsCode": "8534009000",
+      "impDlr": "121777910",
+      "impWgt": "1880445",
+      "statKor": "기타",
+      "year": "2022.03"
+    },
+    {
+      "balPayments": "132159665",
+      "expDlr": "253984537",
+      "expWgt": "1242407",
+      "hsCode": "8534009000",
+      "impDlr": "121824872",
+      "impWgt": "1677993",
+      "statKor": "기타",
+      "year": "2022.04"
+    },
+    {
+      "balPayments": "128862487",
+      "expDlr": "252785981",
+      "expWgt": "1185068",
+      "hsCode": "8534009000",
+      "impDlr": "123923494",
+      "impWgt": "1884856",
+      "statKor": "기타",
+      "year": "2022.05"
+    },
+    {
+      "balPayments": "115953892",
+      "expDlr": "251748554",
+      "expWgt": "1225706",
+      "hsCode": "8534009000",
+      "impDlr": "135794662",
+      "impWgt": "1738837",
+      "statKor": "기타",
+      "year": "2022.06"
+    },
+    {
+      "balPayments": "141346657",
+      "expDlr": "257818851",
+      "expWgt": "1107066",
+      "hsCode": "8534009000",
+      "impDlr": "116472194",
+      "impWgt": "1467378",
+      "statKor": "기타",
+      "year": "2022.07"
+    },
+    {
+      "balPayments": "133659608",
+      "expDlr": "249284232",
+      "expWgt": "1004286",
+      "hsCode": "8534009000",
+      "impDlr": "115624624",
+      "impWgt": "1394849",
+      "statKor": "기타",
+      "year": "2022.08"
+    },
+    {
+      "balPayments": "132026782",
+      "expDlr": "244813168",
+      "expWgt": "1068564",
+      "hsCode": "8534009000",
+      "impDlr": "112786386",
+      "impWgt": "1337427",
+      "statKor": "기타",
+      "year": "2022.09"
+    },
+    {
+      "balPayments": "117240014",
+      "expDlr": "226356602",
+      "expWgt": "986022",
+      "hsCode": "8534009000",
+      "impDlr": "109116588",
+      "impWgt": "1548287",
+      "statKor": "기타",
+      "year": "2022.10"
+    },
+    {
+      "balPayments": "111493799",
+      "expDlr": "217870769",
+      "expWgt": "945450",
+      "hsCode": "8534009000",
+      "impDlr": "106376970",
+      "impWgt": "1533265",
+      "statKor": "기타",
+      "year": "2022.11"
+    },
+    {
+      "balPayments": "83205974",
+      "expDlr": "192351951",
+      "expWgt": "953918",
+      "hsCode": "8534009000",
+      "impDlr": "109145977",
+      "impWgt": "1681770",
+      "statKor": "기타",
+      "year": "2022.12"
+    },
+    {
+      "balPayments": "1480558309",
+      "expDlr": "2883553875",
+      "expWgt": "13346980",
+      "hsCode": "-",
+      "impDlr": "1402995566",
+      "impWgt": "19153871",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "89682593",
+      "expDlr": "194173547",
+      "expWgt": "1006627",
+      "hsCode": "8534009000",
+      "impDlr": "104490954",
+      "impWgt": "1643001",
+      "statKor": "기타",
+      "year": "2023.01"
+    },
+    {
+      "balPayments": "77875143",
+      "expDlr": "195465974",
+      "expWgt": "1036125",
+      "hsCode": "8534009000",
+      "impDlr": "117590831",
+      "impWgt": "1669648",
+      "statKor": "기타",
+      "year": "2023.02"
+    },
+    {
+      "balPayments": "123340320",
+      "expDlr": "237536617",
+      "expWgt": "1249337",
+      "hsCode": "8534009000",
+      "impDlr": "114196297",
+      "impWgt": "1916864",
+      "statKor": "기타",
+      "year": "2023.03"
+    },
+    {
+      "balPayments": "82403886",
+      "expDlr": "187701256",
+      "expWgt": "1015883",
+      "hsCode": "8534009000",
+      "impDlr": "105297370",
+      "impWgt": "1699168",
+      "statKor": "기타",
+      "year": "2023.04"
+    },
+    {
+      "balPayments": "92961726",
+      "expDlr": "199945718",
+      "expWgt": "1141045",
+      "hsCode": "8534009000",
+      "impDlr": "106983992",
+      "impWgt": "1840655",
+      "statKor": "기타",
+      "year": "2023.05"
+    },
+    {
+      "balPayments": "92708125",
+      "expDlr": "200800545",
+      "expWgt": "1189998",
+      "hsCode": "8534009000",
+      "impDlr": "108092420",
+      "impWgt": "1845916",
+      "statKor": "기타",
+      "year": "2023.06"
+    },
+    {
+      "balPayments": "102265571",
+      "expDlr": "206061473",
+      "expWgt": "1153474",
+      "hsCode": "8534009000",
+      "impDlr": "103795902",
+      "impWgt": "1726806",
+      "statKor": "기타",
+      "year": "2023.07"
+    },
+    {
+      "balPayments": "78210775",
+      "expDlr": "193312189",
+      "expWgt": "1088645",
+      "hsCode": "8534009000",
+      "impDlr": "115101414",
+      "impWgt": "1991046",
+      "statKor": "기타",
+      "year": "2023.08"
+    },
+    {
+      "balPayments": "97840118",
+      "expDlr": "193956178",
+      "expWgt": "1018739",
+      "hsCode": "8534009000",
+      "impDlr": "96116060",
+      "impWgt": "1694431",
+      "statKor": "기타",
+      "year": "2023.09"
+    },
+    {
+      "balPayments": "101775452",
+      "expDlr": "205039119",
+      "expWgt": "1033764",
+      "hsCode": "8534009000",
+      "impDlr": "103263667",
+      "impWgt": "1677983",
+      "statKor": "기타",
+      "year": "2023.10"
+    },
+    {
+      "balPayments": "106650147",
+      "expDlr": "210751801",
+      "expWgt": "1125517",
+      "hsCode": "8534009000",
+      "impDlr": "104101654",
+      "impWgt": "1739677",
+      "statKor": "기타",
+      "year": "2023.11"
+    },
+    {
+      "balPayments": "85561566",
+      "expDlr": "186578298",
+      "expWgt": "1023715",
+      "hsCode": "8534009000",
+      "impDlr": "101016732",
+      "impWgt": "1687782",
+      "statKor": "기타",
+      "year": "2023.12"
+    },
+    {
+      "balPayments": "1131275422",
+      "expDlr": "2411322715",
+      "expWgt": "13082869",
+      "hsCode": "-",
+      "impDlr": "1280047293",
+      "impWgt": "21132977",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "105892441",
+      "expDlr": "223423920",
+      "expWgt": "1155172",
+      "hsCode": "8534009000",
+      "impDlr": "117531479",
+      "impWgt": "2032911",
+      "statKor": "기타",
+      "year": "2024.01"
+    },
+    {
+      "balPayments": "98367488",
+      "expDlr": "193185014",
+      "expWgt": "1065673",
+      "hsCode": "8534009000",
+      "impDlr": "94817526",
+      "impWgt": "1396101",
+      "statKor": "기타",
+      "year": "2024.02"
+    },
+    {
+      "balPayments": "88954321",
+      "expDlr": "204943982",
+      "expWgt": "994574",
+      "hsCode": "8534009000",
+      "impDlr": "115989661",
+      "impWgt": "2148510",
+      "statKor": "기타",
+      "year": "2024.03"
+    },
+    {
+      "balPayments": "83163627",
+      "expDlr": "206512441",
+      "expWgt": "1144579",
+      "hsCode": "8534009000",
+      "impDlr": "123348814",
+      "impWgt": "2371094",
+      "statKor": "기타",
+      "year": "2024.04"
+    },
+    {
+      "balPayments": "103366226",
+      "expDlr": "216789639",
+      "expWgt": "1146871",
+      "hsCode": "8534009000",
+      "impDlr": "113423413",
+      "impWgt": "2149227",
+      "statKor": "기타",
+      "year": "2024.05"
+    },
+    {
+      "balPayments": "103865511",
+      "expDlr": "204216263",
+      "expWgt": "998418",
+      "hsCode": "8534009000",
+      "impDlr": "100350752",
+      "impWgt": "1703267",
+      "statKor": "기타",
+      "year": "2024.06"
+    },
+    {
+      "balPayments": "114307784",
+      "expDlr": "225643274",
+      "expWgt": "1166474",
+      "hsCode": "8534009000",
+      "impDlr": "111335490",
+      "impWgt": "1897144",
+      "statKor": "기타",
+      "year": "2024.07"
+    },
+    {
+      "balPayments": "84819047",
+      "expDlr": "197898172",
+      "expWgt": "1019593",
+      "hsCode": "8534009000",
+      "impDlr": "113079125",
+      "impWgt": "1734822",
+      "statKor": "기타",
+      "year": "2024.08"
+    },
+    {
+      "balPayments": "80677698",
+      "expDlr": "189669923",
+      "expWgt": "872214",
+      "hsCode": "8534009000",
+      "impDlr": "108992225",
+      "impWgt": "1774970",
+      "statKor": "기타",
+      "year": "2024.09"
+    },
+    {
+      "balPayments": "110304463",
+      "expDlr": "213538760",
+      "expWgt": "1071184",
+      "hsCode": "8534009000",
+      "impDlr": "103234297",
+      "impWgt": "1683151",
+      "statKor": "기타",
+      "year": "2024.10"
+    },
+    {
+      "balPayments": "96508003",
+      "expDlr": "194472896",
+      "expWgt": "1021423",
+      "hsCode": "8534009000",
+      "impDlr": "97964893",
+      "impWgt": "1672420",
+      "statKor": "기타",
+      "year": "2024.11"
+    },
+    {
+      "balPayments": "85188021",
+      "expDlr": "191341042",
+      "expWgt": "1065278",
+      "hsCode": "8534009000",
+      "impDlr": "106153021",
+      "impWgt": "1919925",
+      "statKor": "기타",
+      "year": "2024.12"
+    },
+    {
+      "balPayments": "1155414630",
+      "expDlr": "2461635326",
+      "expWgt": "12721453",
+      "hsCode": "-",
+      "impDlr": "1306220696",
+      "impWgt": "22483542",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "76227434",
+      "expDlr": "186210561",
+      "expWgt": "1008770",
+      "hsCode": "8534009000",
+      "impDlr": "109983127",
+      "impWgt": "1985101",
+      "statKor": "기타",
+      "year": "2025.01"
+    },
+    {
+      "balPayments": "96117954",
+      "expDlr": "189746644",
+      "expWgt": "1016315",
+      "hsCode": "8534009000",
+      "impDlr": "93628690",
+      "impWgt": "1727314",
+      "statKor": "기타",
+      "year": "2025.02"
+    },
+    {
+      "balPayments": "97564857",
+      "expDlr": "218733426",
+      "expWgt": "1141839",
+      "hsCode": "8534009000",
+      "impDlr": "121168569",
+      "impWgt": "2539703",
+      "statKor": "기타",
+      "year": "2025.03"
+    },
+    {
+      "balPayments": "117727452",
+      "expDlr": "243238879",
+      "expWgt": "1197622",
+      "hsCode": "8534009000",
+      "impDlr": "125511427",
+      "impWgt": "2362967",
+      "statKor": "기타",
+      "year": "2025.04"
+    },
+    {
+      "balPayments": "114495516",
+      "expDlr": "223461329",
+      "expWgt": "1077066",
+      "hsCode": "8534009000",
+      "impDlr": "108965813",
+      "impWgt": "2143918",
+      "statKor": "기타",
+      "year": "2025.05"
+    },
+    {
+      "balPayments": "105620883",
+      "expDlr": "233175706",
+      "expWgt": "1070009",
+      "hsCode": "8534009000",
+      "impDlr": "127554823",
+      "impWgt": "2305966",
+      "statKor": "기타",
+      "year": "2025.06"
+    },
+    {
+      "balPayments": "117593755",
+      "expDlr": "253826715",
+      "expWgt": "1208816",
+      "hsCode": "8534009000",
+      "impDlr": "136232960",
+      "impWgt": "2375621",
+      "statKor": "기타",
+      "year": "2025.07"
+    },
+    {
+      "balPayments": "120845705",
+      "expDlr": "245978463",
+      "expWgt": "1138789",
+      "hsCode": "8534009000",
+      "impDlr": "125132758",
+      "impWgt": "2285571",
+      "statKor": "기타",
+      "year": "2025.08"
+    },
+    {
+      "balPayments": "104014951",
+      "expDlr": "233085979",
+      "expWgt": "1153351",
+      "hsCode": "8534009000",
+      "impDlr": "129071028",
+      "impWgt": "2149637",
+      "statKor": "기타",
+      "year": "2025.09"
+    },
+    {
+      "balPayments": "120613760",
+      "expDlr": "237222192",
+      "expWgt": "1042608",
+      "hsCode": "8534009000",
+      "impDlr": "116608432",
+      "impWgt": "1813124",
+      "statKor": "기타",
+      "year": "2025.10"
+    },
+    {
+      "balPayments": "120744610",
+      "expDlr": "239200245",
+      "expWgt": "1064529",
+      "hsCode": "8534009000",
+      "impDlr": "118455635",
+      "impWgt": "1835928",
+      "statKor": "기타",
+      "year": "2025.11"
+    },
+    {
+      "balPayments": "125608746",
+      "expDlr": "255960805",
+      "expWgt": "1100248",
+      "hsCode": "8534009000",
+      "impDlr": "130352059",
+      "impWgt": "2031824",
+      "statKor": "기타",
+      "year": "2025.12"
+    },
+    {
+      "balPayments": "1317175623",
+      "expDlr": "2759840944",
+      "expWgt": "13219962",
+      "hsCode": "-",
+      "impDlr": "1442665321",
+      "impWgt": "25556674",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "133451913",
+      "expDlr": "266646866",
+      "expWgt": "1110757",
+      "hsCode": "8534009000",
+      "impDlr": "133194953",
+      "impWgt": "2115040",
+      "statKor": "기타",
+      "year": "2026.01"
+    },
+    {
+      "balPayments": "122042673",
+      "expDlr": "225712436",
+      "expWgt": "993929",
+      "hsCode": "8534009000",
+      "impDlr": "103669763",
+      "impWgt": "1613034",
+      "statKor": "기타",
+      "year": "2026.02"
+    },
+    {
+      "balPayments": "114160678",
+      "expDlr": "264237243",
+      "expWgt": "1101908",
+      "hsCode": "8534009000",
+      "impDlr": "150076565",
+      "impWgt": "2646240",
+      "statKor": "기타",
+      "year": "2026.03"
+    },
+    {
+      "balPayments": "118267448",
+      "expDlr": "262991567",
+      "expWgt": "1186298",
+      "hsCode": "8534009000",
+      "impDlr": "144724119",
+      "impWgt": "2621456",
+      "statKor": "기타",
+      "year": "2026.04"
+    },
+    {
+      "balPayments": "114765970",
+      "expDlr": "256614512",
+      "expWgt": "1074525",
+      "hsCode": "8534009000",
+      "impDlr": "141848542",
+      "impWgt": "2354957",
+      "statKor": "기타",
+      "year": "2026.05"
+    },
+    {
+      "balPayments": "123073732",
+      "expDlr": "292433736",
+      "expWgt": "1107364",
+      "hsCode": "8534009000",
+      "impDlr": "169360004",
+      "impWgt": "2543101",
+      "statKor": "기타",
+      "year": "2026.06"
+    },
+    {
+      "balPayments": "123418762",
+      "expDlr": "307920050",
+      "expWgt": "1232496",
+      "hsCode": "8534009000",
+      "impDlr": "184501288",
+      "impWgt": "2533572",
+      "statKor": "기타",
+      "year": "2026.07"
+    },
+    {
+      "balPayments": "849181176",
+      "expDlr": "1876556410",
+      "expWgt": "7807277",
+      "hsCode": "-",
+      "impDlr": "1027375234",
+      "impWgt": "16427400",
+      "statKor": "-",
+      "year": "총계"
+    }
+  ]
+}

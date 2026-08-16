@@ -1,0 +1,738 @@
+{
+  "strt_yymm": "202101",
+  "end_yymm": "202608",
+  "hs_sgn": "8542321030",
+  "label": "nand",
+  "items": [
+    {
+      "balPayments": "337810776",
+      "expDlr": "488969557",
+      "expWgt": "50861",
+      "hsCode": "8542321030",
+      "impDlr": "151158781",
+      "impWgt": "21982",
+      "statKor": "플래시 메모리",
+      "year": "2021.01"
+    },
+    {
+      "balPayments": "336804268",
+      "expDlr": "459703191",
+      "expWgt": "46545",
+      "hsCode": "8542321030",
+      "impDlr": "122898923",
+      "impWgt": "18557",
+      "statKor": "플래시 메모리",
+      "year": "2021.02"
+    },
+    {
+      "balPayments": "296501332",
+      "expDlr": "441894394",
+      "expWgt": "53049",
+      "hsCode": "8542321030",
+      "impDlr": "145393062",
+      "impWgt": "23382",
+      "statKor": "플래시 메모리",
+      "year": "2021.03"
+    },
+    {
+      "balPayments": "329588106",
+      "expDlr": "491393546",
+      "expWgt": "48756",
+      "hsCode": "8542321030",
+      "impDlr": "161805440",
+      "impWgt": "20998",
+      "statKor": "플래시 메모리",
+      "year": "2021.04"
+    },
+    {
+      "balPayments": "360955429",
+      "expDlr": "587405784",
+      "expWgt": "53677",
+      "hsCode": "8542321030",
+      "impDlr": "226450355",
+      "impWgt": "28886",
+      "statKor": "플래시 메모리",
+      "year": "2021.05"
+    },
+    {
+      "balPayments": "453582422",
+      "expDlr": "595764768",
+      "expWgt": "53106",
+      "hsCode": "8542321030",
+      "impDlr": "142182346",
+      "impWgt": "17397",
+      "statKor": "플래시 메모리",
+      "year": "2021.06"
+    },
+    {
+      "balPayments": "284922803",
+      "expDlr": "494346575",
+      "expWgt": "46748",
+      "hsCode": "8542321030",
+      "impDlr": "209423772",
+      "impWgt": "26066",
+      "statKor": "플래시 메모리",
+      "year": "2021.07"
+    },
+    {
+      "balPayments": "381344603",
+      "expDlr": "566156787",
+      "expWgt": "52626",
+      "hsCode": "8542321030",
+      "impDlr": "184812184",
+      "impWgt": "24590",
+      "statKor": "플래시 메모리",
+      "year": "2021.08"
+    },
+    {
+      "balPayments": "469062427",
+      "expDlr": "657444772",
+      "expWgt": "58595",
+      "hsCode": "8542321030",
+      "impDlr": "188382345",
+      "impWgt": "24040",
+      "statKor": "플래시 메모리",
+      "year": "2021.09"
+    },
+    {
+      "balPayments": "471989244",
+      "expDlr": "634112959",
+      "expWgt": "48435",
+      "hsCode": "8542321030",
+      "impDlr": "162123715",
+      "impWgt": "19551",
+      "statKor": "플래시 메모리",
+      "year": "2021.10"
+    },
+    {
+      "balPayments": "313261552",
+      "expDlr": "621119589",
+      "expWgt": "51376",
+      "hsCode": "8542321030",
+      "impDlr": "307858037",
+      "impWgt": "30170",
+      "statKor": "플래시 메모리",
+      "year": "2021.11"
+    },
+    {
+      "balPayments": "373435783",
+      "expDlr": "639834302",
+      "expWgt": "57715",
+      "hsCode": "8542321030",
+      "impDlr": "266398519",
+      "impWgt": "30479",
+      "statKor": "플래시 메모리",
+      "year": "2021.12"
+    },
+    {
+      "balPayments": "4409258745",
+      "expDlr": "6678146224",
+      "expWgt": "621489",
+      "hsCode": "-",
+      "impDlr": "2268887479",
+      "impWgt": "286098",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "326090997",
+      "expDlr": "522251145",
+      "expWgt": "47860",
+      "hsCode": "8542321030",
+      "impDlr": "196160148",
+      "impWgt": "20481",
+      "statKor": "플래시 메모리",
+      "year": "2022.01"
+    },
+    {
+      "balPayments": "387891697",
+      "expDlr": "629182451",
+      "expWgt": "45646",
+      "hsCode": "8542321030",
+      "impDlr": "241290754",
+      "impWgt": "26386",
+      "statKor": "플래시 메모리",
+      "year": "2022.02"
+    },
+    {
+      "balPayments": "521523835",
+      "expDlr": "746116388",
+      "expWgt": "53004",
+      "hsCode": "8542321030",
+      "impDlr": "224592553",
+      "impWgt": "24667",
+      "statKor": "플래시 메모리",
+      "year": "2022.03"
+    },
+    {
+      "balPayments": "604546120",
+      "expDlr": "742018227",
+      "expWgt": "53441",
+      "hsCode": "8542321030",
+      "impDlr": "137472107",
+      "impWgt": "18183",
+      "statKor": "플래시 메모리",
+      "year": "2022.04"
+    },
+    {
+      "balPayments": "538973056",
+      "expDlr": "803340002",
+      "expWgt": "59046",
+      "hsCode": "8542321030",
+      "impDlr": "264366946",
+      "impWgt": "29723",
+      "statKor": "플래시 메모리",
+      "year": "2022.05"
+    },
+    {
+      "balPayments": "540525983",
+      "expDlr": "786481424",
+      "expWgt": "47408",
+      "hsCode": "8542321030",
+      "impDlr": "245955441",
+      "impWgt": "26624",
+      "statKor": "플래시 메모리",
+      "year": "2022.06"
+    },
+    {
+      "balPayments": "542403390",
+      "expDlr": "738164966",
+      "expWgt": "40258",
+      "hsCode": "8542321030",
+      "impDlr": "195761576",
+      "impWgt": "18933",
+      "statKor": "플래시 메모리",
+      "year": "2022.07"
+    },
+    {
+      "balPayments": "458242045",
+      "expDlr": "618529649",
+      "expWgt": "39222",
+      "hsCode": "8542321030",
+      "impDlr": "160287604",
+      "impWgt": "16172",
+      "statKor": "플래시 메모리",
+      "year": "2022.08"
+    },
+    {
+      "balPayments": "508959851",
+      "expDlr": "673134026",
+      "expWgt": "59330",
+      "hsCode": "8542321030",
+      "impDlr": "164174175",
+      "impWgt": "15711",
+      "statKor": "플래시 메모리",
+      "year": "2022.09"
+    },
+    {
+      "balPayments": "307520967",
+      "expDlr": "566863763",
+      "expWgt": "70273",
+      "hsCode": "8542321030",
+      "impDlr": "259342796",
+      "impWgt": "24762",
+      "statKor": "플래시 메모리",
+      "year": "2022.10"
+    },
+    {
+      "balPayments": "312813332",
+      "expDlr": "516919802",
+      "expWgt": "47846",
+      "hsCode": "8542321030",
+      "impDlr": "204106470",
+      "impWgt": "19125",
+      "statKor": "플래시 메모리",
+      "year": "2022.11"
+    },
+    {
+      "balPayments": "183968892",
+      "expDlr": "346621582",
+      "expWgt": "40150",
+      "hsCode": "8542321030",
+      "impDlr": "162652690",
+      "impWgt": "14351",
+      "statKor": "플래시 메모리",
+      "year": "2022.12"
+    },
+    {
+      "balPayments": "5233460165",
+      "expDlr": "7689623425",
+      "expWgt": "603484",
+      "hsCode": "-",
+      "impDlr": "2456163260",
+      "impWgt": "255118",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "89136315",
+      "expDlr": "364211620",
+      "expWgt": "27269",
+      "hsCode": "8542321030",
+      "impDlr": "275075305",
+      "impWgt": "19972",
+      "statKor": "플래시 메모리",
+      "year": "2023.01"
+    },
+    {
+      "balPayments": "225023108",
+      "expDlr": "492061495",
+      "expWgt": "48478",
+      "hsCode": "8542321030",
+      "impDlr": "267038387",
+      "impWgt": "18068",
+      "statKor": "플래시 메모리",
+      "year": "2023.02"
+    },
+    {
+      "balPayments": "419940150",
+      "expDlr": "637444105",
+      "expWgt": "91230",
+      "hsCode": "8542321030",
+      "impDlr": "217503955",
+      "impWgt": "21937",
+      "statKor": "플래시 메모리",
+      "year": "2023.03"
+    },
+    {
+      "balPayments": "204967199",
+      "expDlr": "352486276",
+      "expWgt": "36787",
+      "hsCode": "8542321030",
+      "impDlr": "147519077",
+      "impWgt": "14087",
+      "statKor": "플래시 메모리",
+      "year": "2023.04"
+    },
+    {
+      "balPayments": "-86964949",
+      "expDlr": "370462980",
+      "expWgt": "38686",
+      "hsCode": "8542321030",
+      "impDlr": "457427929",
+      "impWgt": "28847",
+      "statKor": "플래시 메모리",
+      "year": "2023.05"
+    },
+    {
+      "balPayments": "101520425",
+      "expDlr": "469237419",
+      "expWgt": "73154",
+      "hsCode": "8542321030",
+      "impDlr": "367716994",
+      "impWgt": "33171",
+      "statKor": "플래시 메모리",
+      "year": "2023.06"
+    },
+    {
+      "balPayments": "78339102",
+      "expDlr": "355074367",
+      "expWgt": "42873",
+      "hsCode": "8542321030",
+      "impDlr": "276735265",
+      "impWgt": "20262",
+      "statKor": "플래시 메모리",
+      "year": "2023.07"
+    },
+    {
+      "balPayments": "429485411",
+      "expDlr": "563207063",
+      "expWgt": "59198",
+      "hsCode": "8542321030",
+      "impDlr": "133721652",
+      "impWgt": "12347",
+      "statKor": "플래시 메모리",
+      "year": "2023.08"
+    },
+    {
+      "balPayments": "489923100",
+      "expDlr": "711058351",
+      "expWgt": "82318",
+      "hsCode": "8542321030",
+      "impDlr": "221135251",
+      "impWgt": "18269",
+      "statKor": "플래시 메모리",
+      "year": "2023.09"
+    },
+    {
+      "balPayments": "267109393",
+      "expDlr": "563432529",
+      "expWgt": "54652",
+      "hsCode": "8542321030",
+      "impDlr": "296323136",
+      "impWgt": "18866",
+      "statKor": "플래시 메모리",
+      "year": "2023.10"
+    },
+    {
+      "balPayments": "435234960",
+      "expDlr": "576927692",
+      "expWgt": "52482",
+      "hsCode": "8542321030",
+      "impDlr": "141692732",
+      "impWgt": "12915",
+      "statKor": "플래시 메모리",
+      "year": "2023.11"
+    },
+    {
+      "balPayments": "382279639",
+      "expDlr": "623483753",
+      "expWgt": "68567",
+      "hsCode": "8542321030",
+      "impDlr": "241204114",
+      "impWgt": "18774",
+      "statKor": "플래시 메모리",
+      "year": "2023.12"
+    },
+    {
+      "balPayments": "3035993853",
+      "expDlr": "6079087650",
+      "expWgt": "675694",
+      "hsCode": "-",
+      "impDlr": "3043093797",
+      "impWgt": "237515",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "600482486",
+      "expDlr": "857558588",
+      "expWgt": "63396",
+      "hsCode": "8542321030",
+      "impDlr": "257076102",
+      "impWgt": "17152",
+      "statKor": "플래시 메모리",
+      "year": "2024.01"
+    },
+    {
+      "balPayments": "536202336",
+      "expDlr": "889118556",
+      "expWgt": "56074",
+      "hsCode": "8542321030",
+      "impDlr": "352916220",
+      "impWgt": "25024",
+      "statKor": "플래시 메모리",
+      "year": "2024.02"
+    },
+    {
+      "balPayments": "455553878",
+      "expDlr": "816995296",
+      "expWgt": "54996",
+      "hsCode": "8542321030",
+      "impDlr": "361441418",
+      "impWgt": "26501",
+      "statKor": "플래시 메모리",
+      "year": "2024.03"
+    },
+    {
+      "balPayments": "352436835",
+      "expDlr": "615382745",
+      "expWgt": "42592",
+      "hsCode": "8542321030",
+      "impDlr": "262945910",
+      "impWgt": "20128",
+      "statKor": "플래시 메모리",
+      "year": "2024.04"
+    },
+    {
+      "balPayments": "459702561",
+      "expDlr": "685634245",
+      "expWgt": "41898",
+      "hsCode": "8542321030",
+      "impDlr": "225931684",
+      "impWgt": "18655",
+      "statKor": "플래시 메모리",
+      "year": "2024.05"
+    },
+    {
+      "balPayments": "514813772",
+      "expDlr": "677867380",
+      "expWgt": "45475",
+      "hsCode": "8542321030",
+      "impDlr": "163053608",
+      "impWgt": "15991",
+      "statKor": "플래시 메모리",
+      "year": "2024.06"
+    },
+    {
+      "balPayments": "385830837",
+      "expDlr": "536146405",
+      "expWgt": "38350",
+      "hsCode": "8542321030",
+      "impDlr": "150315568",
+      "impWgt": "12434",
+      "statKor": "플래시 메모리",
+      "year": "2024.07"
+    },
+    {
+      "balPayments": "236616681",
+      "expDlr": "388012152",
+      "expWgt": "30319",
+      "hsCode": "8542321030",
+      "impDlr": "151395471",
+      "impWgt": "12994",
+      "statKor": "플래시 메모리",
+      "year": "2024.08"
+    },
+    {
+      "balPayments": "488492015",
+      "expDlr": "626839396",
+      "expWgt": "40645",
+      "hsCode": "8542321030",
+      "impDlr": "138347381",
+      "impWgt": "10901",
+      "statKor": "플래시 메모리",
+      "year": "2024.09"
+    },
+    {
+      "balPayments": "330214367",
+      "expDlr": "440424775",
+      "expWgt": "32599",
+      "hsCode": "8542321030",
+      "impDlr": "110210408",
+      "impWgt": "8342",
+      "statKor": "플래시 메모리",
+      "year": "2024.10"
+    },
+    {
+      "balPayments": "386200552",
+      "expDlr": "478932127",
+      "expWgt": "45868",
+      "hsCode": "8542321030",
+      "impDlr": "92731575",
+      "impWgt": "8412",
+      "statKor": "플래시 메모리",
+      "year": "2024.11"
+    },
+    {
+      "balPayments": "523283373",
+      "expDlr": "612998107",
+      "expWgt": "42186",
+      "hsCode": "8542321030",
+      "impDlr": "89714734",
+      "impWgt": "7757",
+      "statKor": "플래시 메모리",
+      "year": "2024.12"
+    },
+    {
+      "balPayments": "5269829693",
+      "expDlr": "7625909772",
+      "expWgt": "534398",
+      "hsCode": "-",
+      "impDlr": "2356080079",
+      "impWgt": "184291",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "215975514",
+      "expDlr": "307270877",
+      "expWgt": "28242",
+      "hsCode": "8542321030",
+      "impDlr": "91295363",
+      "impWgt": "7818",
+      "statKor": "플래시 메모리",
+      "year": "2025.01"
+    },
+    {
+      "balPayments": "191845327",
+      "expDlr": "294102633",
+      "expWgt": "46779",
+      "hsCode": "8542321030",
+      "impDlr": "102257306",
+      "impWgt": "10451",
+      "statKor": "플래시 메모리",
+      "year": "2025.02"
+    },
+    {
+      "balPayments": "423449305",
+      "expDlr": "526650290",
+      "expWgt": "65525",
+      "hsCode": "8542321030",
+      "impDlr": "103200985",
+      "impWgt": "12489",
+      "statKor": "플래시 메모리",
+      "year": "2025.03"
+    },
+    {
+      "balPayments": "342381338",
+      "expDlr": "430255719",
+      "expWgt": "33012",
+      "hsCode": "8542321030",
+      "impDlr": "87874381",
+      "impWgt": "8853",
+      "statKor": "플래시 메모리",
+      "year": "2025.04"
+    },
+    {
+      "balPayments": "426360096",
+      "expDlr": "561258878",
+      "expWgt": "42167",
+      "hsCode": "8542321030",
+      "impDlr": "134898782",
+      "impWgt": "11313",
+      "statKor": "플래시 메모리",
+      "year": "2025.05"
+    },
+    {
+      "balPayments": "503780225",
+      "expDlr": "620739271",
+      "expWgt": "55076",
+      "hsCode": "8542321030",
+      "impDlr": "116959046",
+      "impWgt": "9843",
+      "statKor": "플래시 메모리",
+      "year": "2025.06"
+    },
+    {
+      "balPayments": "325008305",
+      "expDlr": "461593203",
+      "expWgt": "38721",
+      "hsCode": "8542321030",
+      "impDlr": "136584898",
+      "impWgt": "11247",
+      "statKor": "플래시 메모리",
+      "year": "2025.07"
+    },
+    {
+      "balPayments": "520356112",
+      "expDlr": "645465853",
+      "expWgt": "43917",
+      "hsCode": "8542321030",
+      "impDlr": "125109741",
+      "impWgt": "12881",
+      "statKor": "플래시 메모리",
+      "year": "2025.08"
+    },
+    {
+      "balPayments": "573897775",
+      "expDlr": "706729598",
+      "expWgt": "54374",
+      "hsCode": "8542321030",
+      "impDlr": "132831823",
+      "impWgt": "11812",
+      "statKor": "플래시 메모리",
+      "year": "2025.09"
+    },
+    {
+      "balPayments": "506870198",
+      "expDlr": "672927526",
+      "expWgt": "37913",
+      "hsCode": "8542321030",
+      "impDlr": "166057328",
+      "impWgt": "13937",
+      "statKor": "플래시 메모리",
+      "year": "2025.10"
+    },
+    {
+      "balPayments": "947720472",
+      "expDlr": "1101251822",
+      "expWgt": "40810",
+      "hsCode": "8542321030",
+      "impDlr": "153531350",
+      "impWgt": "10575",
+      "statKor": "플래시 메모리",
+      "year": "2025.11"
+    },
+    {
+      "balPayments": "1014268467",
+      "expDlr": "1275594726",
+      "expWgt": "44990",
+      "hsCode": "8542321030",
+      "impDlr": "261326259",
+      "impWgt": "12724",
+      "statKor": "플래시 메모리",
+      "year": "2025.12"
+    },
+    {
+      "balPayments": "5991913134",
+      "expDlr": "7603840396",
+      "expWgt": "531526",
+      "hsCode": "-",
+      "impDlr": "1611927262",
+      "impWgt": "133943",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "1195999507",
+      "expDlr": "1434956451",
+      "expWgt": "43577",
+      "hsCode": "8542321030",
+      "impDlr": "238956944",
+      "impWgt": "12016",
+      "statKor": "플래시 메모리",
+      "year": "2026.01"
+    },
+    {
+      "balPayments": "1178833523",
+      "expDlr": "1406223535",
+      "expWgt": "37497",
+      "hsCode": "8542321030",
+      "impDlr": "227390012",
+      "impWgt": "11047",
+      "statKor": "플래시 메모리",
+      "year": "2026.02"
+    },
+    {
+      "balPayments": "2248851643",
+      "expDlr": "2544596946",
+      "expWgt": "55480",
+      "hsCode": "8542321030",
+      "impDlr": "295745303",
+      "impWgt": "12884",
+      "statKor": "플래시 메모리",
+      "year": "2026.03"
+    },
+    {
+      "balPayments": "1422756678",
+      "expDlr": "1673744099",
+      "expWgt": "36438",
+      "hsCode": "8542321030",
+      "impDlr": "250987421",
+      "impWgt": "12018",
+      "statKor": "플래시 메모리",
+      "year": "2026.04"
+    },
+    {
+      "balPayments": "1449270942",
+      "expDlr": "1721738700",
+      "expWgt": "30337",
+      "hsCode": "8542321030",
+      "impDlr": "272467758",
+      "impWgt": "12289",
+      "statKor": "플래시 메모리",
+      "year": "2026.05"
+    },
+    {
+      "balPayments": "2250979621",
+      "expDlr": "2486161310",
+      "expWgt": "40030",
+      "hsCode": "8542321030",
+      "impDlr": "235181689",
+      "impWgt": "11164",
+      "statKor": "플래시 메모리",
+      "year": "2026.06"
+    },
+    {
+      "balPayments": "1551484878",
+      "expDlr": "1780647499",
+      "expWgt": "28836",
+      "hsCode": "8542321030",
+      "impDlr": "229162621",
+      "impWgt": "11578",
+      "statKor": "플래시 메모리",
+      "year": "2026.07"
+    },
+    {
+      "balPayments": "11298176792",
+      "expDlr": "13048068540",
+      "expWgt": "272195",
+      "hsCode": "-",
+      "impDlr": "1749891748",
+      "impWgt": "82996",
+      "statKor": "-",
+      "year": "총계"
+    }
+  ]
+}

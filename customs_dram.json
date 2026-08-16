@@ -1,0 +1,738 @@
+{
+  "strt_yymm": "202101",
+  "end_yymm": "202608",
+  "hs_sgn": "8542321010",
+  "label": "dram",
+  "items": [
+    {
+      "balPayments": "1086756714",
+      "expDlr": "1497226281",
+      "expWgt": "112614",
+      "hsCode": "8542321010",
+      "impDlr": "410469567",
+      "impWgt": "40491",
+      "statKor": "디램",
+      "year": "2021.01"
+    },
+    {
+      "balPayments": "1148171083",
+      "expDlr": "1526633720",
+      "expWgt": "154410",
+      "hsCode": "8542321010",
+      "impDlr": "378462637",
+      "impWgt": "34969",
+      "statKor": "디램",
+      "year": "2021.02"
+    },
+    {
+      "balPayments": "1350415171",
+      "expDlr": "1785261687",
+      "expWgt": "170200",
+      "hsCode": "8542321010",
+      "impDlr": "434846516",
+      "impWgt": "42836",
+      "statKor": "디램",
+      "year": "2021.03"
+    },
+    {
+      "balPayments": "1498324658",
+      "expDlr": "1858230153",
+      "expWgt": "155028",
+      "hsCode": "8542321010",
+      "impDlr": "359905495",
+      "impWgt": "38697",
+      "statKor": "디램",
+      "year": "2021.04"
+    },
+    {
+      "balPayments": "1560101597",
+      "expDlr": "1946726364",
+      "expWgt": "161139",
+      "hsCode": "8542321010",
+      "impDlr": "386624767",
+      "impWgt": "40562",
+      "statKor": "디램",
+      "year": "2021.05"
+    },
+    {
+      "balPayments": "1789897135",
+      "expDlr": "2176813167",
+      "expWgt": "126963",
+      "hsCode": "8542321010",
+      "impDlr": "386916032",
+      "impWgt": "41126",
+      "statKor": "디램",
+      "year": "2021.06"
+    },
+    {
+      "balPayments": "1802559704",
+      "expDlr": "2281692195",
+      "expWgt": "125481",
+      "hsCode": "8542321010",
+      "impDlr": "479132491",
+      "impWgt": "42032",
+      "statKor": "디램",
+      "year": "2021.07"
+    },
+    {
+      "balPayments": "2039844086",
+      "expDlr": "2571096763",
+      "expWgt": "143500",
+      "hsCode": "8542321010",
+      "impDlr": "531252677",
+      "impWgt": "42571",
+      "statKor": "디램",
+      "year": "2021.08"
+    },
+    {
+      "balPayments": "2095771636",
+      "expDlr": "2568940514",
+      "expWgt": "133506",
+      "hsCode": "8542321010",
+      "impDlr": "473168878",
+      "impWgt": "45280",
+      "statKor": "디램",
+      "year": "2021.09"
+    },
+    {
+      "balPayments": "1953441119",
+      "expDlr": "2466591328",
+      "expWgt": "143209",
+      "hsCode": "8542321010",
+      "impDlr": "513150209",
+      "impWgt": "44091",
+      "statKor": "디램",
+      "year": "2021.10"
+    },
+    {
+      "balPayments": "1719686284",
+      "expDlr": "2453171225",
+      "expWgt": "126253",
+      "hsCode": "8542321010",
+      "impDlr": "733484941",
+      "impWgt": "55411",
+      "statKor": "디램",
+      "year": "2021.11"
+    },
+    {
+      "balPayments": "1852882838",
+      "expDlr": "2556653940",
+      "expWgt": "146062",
+      "hsCode": "8542321010",
+      "impDlr": "703771102",
+      "impWgt": "63806",
+      "statKor": "디램",
+      "year": "2021.12"
+    },
+    {
+      "balPayments": "19897852025",
+      "expDlr": "25689037337",
+      "expWgt": "1698365",
+      "hsCode": "-",
+      "impDlr": "5791185312",
+      "impWgt": "531872",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "1716016123",
+      "expDlr": "2258480961",
+      "expWgt": "147241",
+      "hsCode": "8542321010",
+      "impDlr": "542464838",
+      "impWgt": "45566",
+      "statKor": "디램",
+      "year": "2022.01"
+    },
+    {
+      "balPayments": "1622902665",
+      "expDlr": "2164415779",
+      "expWgt": "136233",
+      "hsCode": "8542321010",
+      "impDlr": "541513114",
+      "impWgt": "37396",
+      "statKor": "디램",
+      "year": "2022.02"
+    },
+    {
+      "balPayments": "1904104565",
+      "expDlr": "2462223601",
+      "expWgt": "162127",
+      "hsCode": "8542321010",
+      "impDlr": "558119036",
+      "impWgt": "47620",
+      "statKor": "디램",
+      "year": "2022.03"
+    },
+    {
+      "balPayments": "1656054036",
+      "expDlr": "2183887307",
+      "expWgt": "135204",
+      "hsCode": "8542321010",
+      "impDlr": "527833271",
+      "impWgt": "38612",
+      "statKor": "디램",
+      "year": "2022.04"
+    },
+    {
+      "balPayments": "1885881569",
+      "expDlr": "2469963975",
+      "expWgt": "115449",
+      "hsCode": "8542321010",
+      "impDlr": "584082406",
+      "impWgt": "47374",
+      "statKor": "디램",
+      "year": "2022.05"
+    },
+    {
+      "balPayments": "1872060224",
+      "expDlr": "2489672563",
+      "expWgt": "146849",
+      "hsCode": "8542321010",
+      "impDlr": "617612339",
+      "impWgt": "43767",
+      "statKor": "디램",
+      "year": "2022.06"
+    },
+    {
+      "balPayments": "1741863076",
+      "expDlr": "2368371059",
+      "expWgt": "189105",
+      "hsCode": "8542321010",
+      "impDlr": "626507983",
+      "impWgt": "52878",
+      "statKor": "디램",
+      "year": "2022.07"
+    },
+    {
+      "balPayments": "1303503545",
+      "expDlr": "2003245387",
+      "expWgt": "132187",
+      "hsCode": "8542321010",
+      "impDlr": "699741842",
+      "impWgt": "56909",
+      "statKor": "디램",
+      "year": "2022.08"
+    },
+    {
+      "balPayments": "1183019867",
+      "expDlr": "1823274576",
+      "expWgt": "131688",
+      "hsCode": "8542321010",
+      "impDlr": "640254709",
+      "impWgt": "54613",
+      "statKor": "디램",
+      "year": "2022.09"
+    },
+    {
+      "balPayments": "872010019",
+      "expDlr": "1565413680",
+      "expWgt": "175212",
+      "hsCode": "8542321010",
+      "impDlr": "693403661",
+      "impWgt": "55570",
+      "statKor": "디램",
+      "year": "2022.10"
+    },
+    {
+      "balPayments": "734963730",
+      "expDlr": "1402702132",
+      "expWgt": "163198",
+      "hsCode": "8542321010",
+      "impDlr": "667738402",
+      "impWgt": "57004",
+      "statKor": "디램",
+      "year": "2022.11"
+    },
+    {
+      "balPayments": "808936578",
+      "expDlr": "1419716100",
+      "expWgt": "192471",
+      "hsCode": "8542321010",
+      "impDlr": "610779522",
+      "impWgt": "72267",
+      "statKor": "디램",
+      "year": "2022.12"
+    },
+    {
+      "balPayments": "17301315997",
+      "expDlr": "24611367120",
+      "expWgt": "1826964",
+      "hsCode": "-",
+      "impDlr": "7310051123",
+      "impWgt": "609576",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "345471249",
+      "expDlr": "889144043",
+      "expWgt": "117589",
+      "hsCode": "8542321010",
+      "impDlr": "543672794",
+      "impWgt": "45806",
+      "statKor": "디램",
+      "year": "2023.01"
+    },
+    {
+      "balPayments": "505267472",
+      "expDlr": "947429033",
+      "expWgt": "113507",
+      "hsCode": "8542321010",
+      "impDlr": "442161561",
+      "impWgt": "42259",
+      "statKor": "디램",
+      "year": "2023.02"
+    },
+    {
+      "balPayments": "740322984",
+      "expDlr": "1134771349",
+      "expWgt": "132726",
+      "hsCode": "8542321010",
+      "impDlr": "394448365",
+      "impWgt": "40040",
+      "statKor": "디램",
+      "year": "2023.03"
+    },
+    {
+      "balPayments": "780917071",
+      "expDlr": "1163518682",
+      "expWgt": "146179",
+      "hsCode": "8542321010",
+      "impDlr": "382601611",
+      "impWgt": "57144",
+      "statKor": "디램",
+      "year": "2023.04"
+    },
+    {
+      "balPayments": "829432613",
+      "expDlr": "1193004804",
+      "expWgt": "157646",
+      "hsCode": "8542321010",
+      "impDlr": "363572191",
+      "impWgt": "48166",
+      "statKor": "디램",
+      "year": "2023.05"
+    },
+    {
+      "balPayments": "778680659",
+      "expDlr": "1164243281",
+      "expWgt": "151030",
+      "hsCode": "8542321010",
+      "impDlr": "385562622",
+      "impWgt": "43295",
+      "statKor": "디램",
+      "year": "2023.06"
+    },
+    {
+      "balPayments": "695087583",
+      "expDlr": "1142171397",
+      "expWgt": "105137",
+      "hsCode": "8542321010",
+      "impDlr": "447083814",
+      "impWgt": "41911",
+      "statKor": "디램",
+      "year": "2023.07"
+    },
+    {
+      "balPayments": "821614840",
+      "expDlr": "1285823533",
+      "expWgt": "128943",
+      "hsCode": "8542321010",
+      "impDlr": "464208693",
+      "impWgt": "36855",
+      "statKor": "디램",
+      "year": "2023.08"
+    },
+    {
+      "balPayments": "803469977",
+      "expDlr": "1181502470",
+      "expWgt": "132541",
+      "hsCode": "8542321010",
+      "impDlr": "378032493",
+      "impWgt": "32940",
+      "statKor": "디램",
+      "year": "2023.09"
+    },
+    {
+      "balPayments": "721450046",
+      "expDlr": "1140724023",
+      "expWgt": "112381",
+      "hsCode": "8542321010",
+      "impDlr": "419273977",
+      "impWgt": "32821",
+      "statKor": "디램",
+      "year": "2023.10"
+    },
+    {
+      "balPayments": "884162603",
+      "expDlr": "1341588637",
+      "expWgt": "129216",
+      "hsCode": "8542321010",
+      "impDlr": "457426034",
+      "impWgt": "53966",
+      "statKor": "디램",
+      "year": "2023.11"
+    },
+    {
+      "balPayments": "961977354",
+      "expDlr": "1452659619",
+      "expWgt": "159940",
+      "hsCode": "8542321010",
+      "impDlr": "490682265",
+      "impWgt": "47136",
+      "statKor": "디램",
+      "year": "2023.12"
+    },
+    {
+      "balPayments": "8867854451",
+      "expDlr": "14036580871",
+      "expWgt": "1586835",
+      "hsCode": "-",
+      "impDlr": "5168726420",
+      "impWgt": "522339",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "942073912",
+      "expDlr": "1407209178",
+      "expWgt": "128871",
+      "hsCode": "8542321010",
+      "impDlr": "465135266",
+      "impWgt": "43531",
+      "statKor": "디램",
+      "year": "2024.01"
+    },
+    {
+      "balPayments": "1038605677",
+      "expDlr": "1491461901",
+      "expWgt": "116134",
+      "hsCode": "8542321010",
+      "impDlr": "452856224",
+      "impWgt": "44272",
+      "statKor": "디램",
+      "year": "2024.02"
+    },
+    {
+      "balPayments": "1159749094",
+      "expDlr": "1628992789",
+      "expWgt": "112855",
+      "hsCode": "8542321010",
+      "impDlr": "469243695",
+      "impWgt": "58985",
+      "statKor": "디램",
+      "year": "2024.03"
+    },
+    {
+      "balPayments": "1146872627",
+      "expDlr": "1594783559",
+      "expWgt": "106336",
+      "hsCode": "8542321010",
+      "impDlr": "447910932",
+      "impWgt": "43471",
+      "statKor": "디램",
+      "year": "2024.04"
+    },
+    {
+      "balPayments": "1275054817",
+      "expDlr": "1767125202",
+      "expWgt": "114315",
+      "hsCode": "8542321010",
+      "impDlr": "492070385",
+      "impWgt": "47933",
+      "statKor": "디램",
+      "year": "2024.05"
+    },
+    {
+      "balPayments": "1354440317",
+      "expDlr": "1899278376",
+      "expWgt": "116958",
+      "hsCode": "8542321010",
+      "impDlr": "544838059",
+      "impWgt": "40339",
+      "statKor": "디램",
+      "year": "2024.06"
+    },
+    {
+      "balPayments": "1465353901",
+      "expDlr": "1986235775",
+      "expWgt": "105435",
+      "hsCode": "8542321010",
+      "impDlr": "520881874",
+      "impWgt": "33743",
+      "statKor": "디램",
+      "year": "2024.07"
+    },
+    {
+      "balPayments": "1302045771",
+      "expDlr": "1839895463",
+      "expWgt": "97961",
+      "hsCode": "8542321010",
+      "impDlr": "537849692",
+      "impWgt": "46778",
+      "statKor": "디램",
+      "year": "2024.08"
+    },
+    {
+      "balPayments": "1351214462",
+      "expDlr": "1888282735",
+      "expWgt": "121385",
+      "hsCode": "8542321010",
+      "impDlr": "537068273",
+      "impWgt": "44546",
+      "statKor": "디램",
+      "year": "2024.09"
+    },
+    {
+      "balPayments": "1237586708",
+      "expDlr": "1912033811",
+      "expWgt": "95560",
+      "hsCode": "8542321010",
+      "impDlr": "674447103",
+      "impWgt": "47297",
+      "statKor": "디램",
+      "year": "2024.10"
+    },
+    {
+      "balPayments": "1218025143",
+      "expDlr": "1825067835",
+      "expWgt": "106942",
+      "hsCode": "8542321010",
+      "impDlr": "607042692",
+      "impWgt": "42557",
+      "statKor": "디램",
+      "year": "2024.11"
+    },
+    {
+      "balPayments": "1338971627",
+      "expDlr": "2096464352",
+      "expWgt": "135570",
+      "hsCode": "8542321010",
+      "impDlr": "757492725",
+      "impWgt": "52433",
+      "statKor": "디램",
+      "year": "2024.12"
+    },
+    {
+      "balPayments": "14829994056",
+      "expDlr": "21336830976",
+      "expWgt": "1358322",
+      "hsCode": "-",
+      "impDlr": "6506836920",
+      "impWgt": "545885",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "1225494143",
+      "expDlr": "1836333612",
+      "expWgt": "125008",
+      "hsCode": "8542321010",
+      "impDlr": "610839469",
+      "impWgt": "55248",
+      "statKor": "디램",
+      "year": "2025.01"
+    },
+    {
+      "balPayments": "1077011447",
+      "expDlr": "1681458212",
+      "expWgt": "125509",
+      "hsCode": "8542321010",
+      "impDlr": "604446765",
+      "impWgt": "57752",
+      "statKor": "디램",
+      "year": "2025.02"
+    },
+    {
+      "balPayments": "1598917874",
+      "expDlr": "2106604276",
+      "expWgt": "148325",
+      "hsCode": "8542321010",
+      "impDlr": "507686402",
+      "impWgt": "56744",
+      "statKor": "디램",
+      "year": "2025.03"
+    },
+    {
+      "balPayments": "1496475089",
+      "expDlr": "2103328275",
+      "expWgt": "134012",
+      "hsCode": "8542321010",
+      "impDlr": "606853186",
+      "impWgt": "50051",
+      "statKor": "디램",
+      "year": "2025.04"
+    },
+    {
+      "balPayments": "1565227418",
+      "expDlr": "2244898642",
+      "expWgt": "160112",
+      "hsCode": "8542321010",
+      "impDlr": "679671224",
+      "impWgt": "63170",
+      "statKor": "디램",
+      "year": "2025.05"
+    },
+    {
+      "balPayments": "1664415652",
+      "expDlr": "2291729325",
+      "expWgt": "188467",
+      "hsCode": "8542321010",
+      "impDlr": "627313673",
+      "impWgt": "65020",
+      "statKor": "디램",
+      "year": "2025.06"
+    },
+    {
+      "balPayments": "1600269832",
+      "expDlr": "2387705705",
+      "expWgt": "160312",
+      "hsCode": "8542321010",
+      "impDlr": "787435873",
+      "impWgt": "52901",
+      "statKor": "디램",
+      "year": "2025.07"
+    },
+    {
+      "balPayments": "1988696662",
+      "expDlr": "2615929305",
+      "expWgt": "147994",
+      "hsCode": "8542321010",
+      "impDlr": "627232643",
+      "impWgt": "44823",
+      "statKor": "디램",
+      "year": "2025.08"
+    },
+    {
+      "balPayments": "1855908194",
+      "expDlr": "2654060655",
+      "expWgt": "159930",
+      "hsCode": "8542321010",
+      "impDlr": "798152461",
+      "impWgt": "60977",
+      "statKor": "디램",
+      "year": "2025.09"
+    },
+    {
+      "balPayments": "2218240946",
+      "expDlr": "2855276459",
+      "expWgt": "137893",
+      "hsCode": "8542321010",
+      "impDlr": "637035513",
+      "impWgt": "41762",
+      "statKor": "디램",
+      "year": "2025.10"
+    },
+    {
+      "balPayments": "3035610241",
+      "expDlr": "3604209656",
+      "expWgt": "148522",
+      "hsCode": "8542321010",
+      "impDlr": "568599415",
+      "impWgt": "39542",
+      "statKor": "디램",
+      "year": "2025.11"
+    },
+    {
+      "balPayments": "3273204242",
+      "expDlr": "4156349480",
+      "expWgt": "175192",
+      "hsCode": "8542321010",
+      "impDlr": "883145238",
+      "impWgt": "52122",
+      "statKor": "디램",
+      "year": "2025.12"
+    },
+    {
+      "balPayments": "22599471740",
+      "expDlr": "30537883602",
+      "expWgt": "1811276",
+      "hsCode": "-",
+      "impDlr": "7938411862",
+      "impWgt": "640112",
+      "statKor": "-",
+      "year": "총계"
+    },
+    {
+      "balPayments": "4018095333",
+      "expDlr": "5059378865",
+      "expWgt": "142420",
+      "hsCode": "8542321010",
+      "impDlr": "1041283532",
+      "impWgt": "54788",
+      "statKor": "디램",
+      "year": "2026.01"
+    },
+    {
+      "balPayments": "5565453445",
+      "expDlr": "6490777059",
+      "expWgt": "134749",
+      "hsCode": "8542321010",
+      "impDlr": "925323614",
+      "impWgt": "37762",
+      "statKor": "디램",
+      "year": "2026.02"
+    },
+    {
+      "balPayments": "6799778063",
+      "expDlr": "8012443877",
+      "expWgt": "145289",
+      "hsCode": "8542321010",
+      "impDlr": "1212665814",
+      "impWgt": "43959",
+      "statKor": "디램",
+      "year": "2026.03"
+    },
+    {
+      "balPayments": "8234994034",
+      "expDlr": "9248046034",
+      "expWgt": "139113",
+      "hsCode": "8542321010",
+      "impDlr": "1013052000",
+      "impWgt": "35748",
+      "statKor": "디램",
+      "year": "2026.04"
+    },
+    {
+      "balPayments": "10362794045",
+      "expDlr": "11428371245",
+      "expWgt": "147350",
+      "hsCode": "8542321010",
+      "impDlr": "1065577200",
+      "impWgt": "33963",
+      "statKor": "디램",
+      "year": "2026.05"
+    },
+    {
+      "balPayments": "10268524551",
+      "expDlr": "11175623231",
+      "expWgt": "149633",
+      "hsCode": "8542321010",
+      "impDlr": "907098680",
+      "impWgt": "41655",
+      "statKor": "디램",
+      "year": "2026.06"
+    },
+    {
+      "balPayments": "12416014830",
+      "expDlr": "13551552131",
+      "expWgt": "155818",
+      "hsCode": "8542321010",
+      "impDlr": "1135537301",
+      "impWgt": "40047",
+      "statKor": "디램",
+      "year": "2026.07"
+    },
+    {
+      "balPayments": "57665654301",
+      "expDlr": "64966192442",
+      "expWgt": "1014372",
+      "hsCode": "-",
+      "impDlr": "7300538141",
+      "impWgt": "287922",
+      "statKor": "-",
+      "year": "총계"
+    }
+  ]
+}
