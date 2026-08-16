@@ -135,7 +135,12 @@ def report():
         except Exception:
             daily_bars = None
 
-        html, verdict, composite_pct = core.build_report(code, name, quote["output"], annual, bars, daily_bars)
+        try:
+            _, investor_trend = core._call_with_retry(core.get_investor_trend, token, appkey, appsecret, code)
+        except Exception:
+            investor_trend = None
+
+        html, verdict, composite_pct = core.build_report(code, name, quote["output"], annual, bars, daily_bars, investor_trend)
         return Response(html, mimetype="text/html")
 
     except SystemExit as e:

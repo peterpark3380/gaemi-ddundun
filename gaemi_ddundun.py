@@ -37,6 +37,16 @@ HOW TO RUN
   (KIS API로 자동 조회되는 게 아니라, 증권사 리포트를 보고 직접 입력/갱신하는 파일 - 형식은
   파일 안 예시 참고). 파일이 없거나 해당 종목 항목이 없으면 그 섹션은 자동으로 생략된다.
 
+  "과거 급등 이벤트 백테스트"까지 보려면 미리 event_backtest.py를 한 번 실행해서
+  event_backtest_<종목코드>.json을 만들어둬야 함:
+    python3 event_backtest.py 011070 LG이노텍
+  (일봉 데이터를 몇 년치 여러 번 나눠 받아오기 때문에 시간이 좀 걸린다). 실행해두면 이후
+  gaemi_ddundun.py 검색 시 자동으로 반영된다. 파일이 없으면 그 섹션은 생략된다.
+
+  "PER-주가 상관관계 분석"(상관계수 + 지수화 차트 + PER 구간별 이후 수익률 백테스트)과
+  "외국인·프로그램매매 수급"(당일 외국인 보유율/순매수 + 최근 추이) 섹션은 추가 설정 없이
+  자동으로 붙는다 (기존에 이미 받아오던 월별 데이터/현재가 조회 응답을 재활용).
+
 OUTPUT
   개미는뚠뚠_리포트_<종목코드>.html  - 더블클릭하면 브라우저에서 바로 열림
 """
@@ -209,6 +219,18 @@ def get_daily_bars_chunked(token, appkey, appsecret, symbol, lookback_days=400, 
     return [by_date[d] for d in sorted(by_date)]
 
 
+def get_investor_trend(token, appkey, appsecret, symbol):
+    """일별 투자자매매동향(최근 거래일 기준 외국인/기관/개인 순매수) - tr_id FHKST01010900.
+    주의: 이 엔드포인트는 현재가 조회(FHKST01010100)만큼 실전 검증을 많이 못 해봤다. 응답 스키마가
+    예상과 다르면 render_investor_flow_section()에서 그 부분만 조용히 생략된다(리포트 자체는 안 깨짐)."""
+    url = f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-investor"
+    headers = {"content-type": "application/json; charset=utf-8", "authorization": f"Bearer {token}",
+               "appkey": appkey, "appsecret": appsecret, "tr_id": "FHKST01010900"}
+    params = {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": symbol}
+    r = requests.get(url, headers=headers, params=params, timeout=15)
+    return r.status_code, r.json()
+
+
 # --------------------------------------------------------------------- 방법론
 
 def known_fy(year, month):
@@ -342,6 +364,150 @@ def corr_verdict(r):
     if ar >= 0.3:
         return "약한 신호", "#fab219"
     return "무의미", "#898781"
+
+
+# --------------------------------------------------------------------- PER-주가 상관관계 분석
+# 주의: PER = 주가 ÷ EPS 이므로, 같은 회계연도 실적(EPS 고정)이 적용되는 구간 안에서는 주가와
+# PER이 정의상 거의 기계적으로 함께 움직인다 (분모가 상수인 비례식). 그래서 아래 상관계수는
+# "PER이 주가를 예측한다"는 의미가 아니라, 그 시기에 이익(EPS)이 주가보다 빠르게/느리게
+# 바뀌었는지를 드러내는 지표에 가깝다 - 리포트에도 이 점을 항상 명시한다. 좀 더 실질적으로
+# "밸류에이션이 낮았을 때 실제로 이후 수익률이 더 좋았는가"를 보려면 per_forward_return_analysis()
+# (구간별 이후 수익률)가 더 적합하다.
+
+def per_price_correlation(history):
+    """history: [(ym, price, per, pbr), ...] 오름차순. 전체기간/최근24개월/최근12개월 Pearson r."""
+    valid = [(price, per) for _, price, per, _ in history if per is not None]
+    if len(valid) < 12:
+        return None
+
+    def corr_for(n_months):
+        sub = valid[-n_months:] if n_months else valid
+        if len(sub) < 6:
+            return None
+        return _pearson([p for p, _ in sub], [pe for _, pe in sub])
+
+    return {"전체기간": corr_for(None), "최근24개월": corr_for(24), "최근12개월": corr_for(12), "n": len(valid)}
+
+
+def _add_months(ym, h):
+    y, m = map(int, ym.split("-"))
+    total = (y * 12 + (m - 1)) + h
+    ny, nm = divmod(total, 12)
+    return f"{ny:04d}-{nm + 1:02d}"
+
+
+def per_forward_return_analysis(history, horizons_months=(6, 12)):
+    """PER이 '그 시점까지의 과거'(확장윈도우, 미래데이터 미포함) 중 몇 %ile였는지로 5구간을 나누고,
+    구간별로 이후 h개월 뒤 수익률을 집계. 반환: {bucket: {h: {"n","mean","median","win_rate"}}}
+    또는 데이터 부족 시 None."""
+    valid = [row for row in history if row[2] is not None]
+    if len(valid) < 24:
+        return None
+    by_ym = {row[0]: row for row in history}
+
+    def classify(pct):
+        if pct < 0.20:
+            return "0-20%(저평가)"
+        if pct < 0.40:
+            return "20-40%"
+        if pct < 0.60:
+            return "40-60%"
+        if pct < 0.80:
+            return "60-80%"
+        return "80-100%(고평가)"
+
+    buckets = {b: {h: [] for h in horizons_months} for b in
+               ["0-20%(저평가)", "20-40%", "40-60%", "60-80%", "80-100%(고평가)"]}
+
+    for pos, row in enumerate(valid):
+        if pos < 12:  # 최소 12개월 이상 쌓인 뒤부터 (초기 percentile은 표본이 너무 적어 불안정)
+            continue
+        ym, price, per, pbr = row
+        past_pers = [r[2] for r in valid[:pos + 1]]
+        pct = sum(1 for v in past_pers if v <= per) / len(past_pers)
+        bucket = classify(pct)
+        for h in horizons_months:
+            target = by_ym.get(_add_months(ym, h))
+            if target is not None and price:
+                buckets[bucket][h].append((target[1] - price) / price)
+
+    aggregate = {}
+    for b, hmap in buckets.items():
+        aggregate[b] = {}
+        for h, vals in hmap.items():
+            if vals:
+                aggregate[b][h] = {"n": len(vals), "mean": statistics.mean(vals),
+                                    "median": statistics.median(vals),
+                                    "win_rate": sum(1 for v in vals if v > 0) / len(vals)}
+            else:
+                aggregate[b][h] = {"n": 0, "mean": None, "median": None, "win_rate": None}
+    return aggregate
+
+
+def render_per_price_correlation_section(history):
+    corr = per_price_correlation(history)
+    fwd = per_forward_return_analysis(history)
+    if corr is None and fwd is None:
+        return ""
+
+    corr_html = ""
+    if corr is not None:
+        rows = []
+        for label in ["전체기간", "최근24개월", "최근12개월"]:
+            r = corr[label]
+            vtext, vcolor = corr_verdict(r)
+            rows.append(f"<tr><td>{label}</td><td>{fmt_r(r)}</td>"
+                        f"<td><span class='corr-badge' style='background:{vcolor}'>{vtext}</span></td></tr>")
+        chart = index_dual_chart_svg(history)
+        corr_html = f"""
+    <div class="tech-subtitle">PER-주가 상관계수 (Pearson r)</div>
+    <table class="corr-table">
+      <tr><th>구간</th><th>r</th><th>판정</th></tr>
+      {''.join(rows)}
+    </table>
+    <div class="tech-subtitle">주가 vs PER 추이 비교 (각각 시작월=100 기준 지수화)</div>
+    <div class="chart-legend">
+      <span><span class="dot" style="background:var(--series-1)"></span>주가(지수화)</span>
+      <span><span class="dot" style="background:var(--series-2)"></span>PER(지수화)</span>
+    </div>
+    {chart}
+    <div class="tech-explain">PER = 주가 ÷ EPS라서, 같은 회계연도 실적이 적용되는 구간(보통 12개월) 안에서는
+    주가와 PER이 정의상 거의 기계적으로 함께 움직입니다. 그래서 이 상관계수 자체가 "PER이 주가를 예측한다"는
+    뜻은 아니고, 두 선이 벌어지는 시점(예: 주가는 오르는데 PER은 안 오르거나 내리는 구간)이 있다면 그건
+    실적(EPS)이 주가보다 더 빠르게 성장하고 있었다는 뜻이라 오히려 눈여겨볼 만합니다.</div>"""
+
+    fwd_html = ""
+    if fwd is not None:
+        blocks = []
+        for h, hlabel in [(6, "6개월 후"), (12, "12개월 후")]:
+            rows = []
+            for b in ["0-20%(저평가)", "20-40%", "40-60%", "60-80%", "80-100%(고평가)"]:
+                a = fwd[b][h]
+                win = fmt_pct(a["win_rate"]) if a["win_rate"] is not None else "-"
+                rows.append(f"<tr><td>{b}</td><td>{a['n']}</td>"
+                            f"<td>{fmt_signed_pct(a['mean'])}</td><td>{fmt_signed_pct(a['median'])}</td><td>{win}</td></tr>")
+            blocks.append(f"""
+    <div class="tech-subtitle">PER 구간(그 시점까지 과거 대비 %ile)별 {hlabel} 수익률</div>
+    <table class="corr-table">
+      <tr><th>PER 구간</th><th>표본</th><th>평균수익률</th><th>중앙값</th><th>승률</th></tr>
+      {''.join(rows)}
+    </table>""")
+        fwd_html = f"""
+    {''.join(blocks)}
+    <div class="tech-explain">PER 백분위는 그 시점까지의 과거 데이터만 사용해 계산했습니다(미래 데이터 미포함,
+    사후편향 방지). "0-20%(저평가)" 구간에서 이후 수익률이 실제로 더 좋고 승률도 높다면, 위 밸류에이션
+    판단이 이 종목에서는 통계적으로도 근거가 있다는 뜻이고, 반대로 구간별 차이가 뚜렷하지 않다면 이
+    종목은 "싸다고 꼭 오르지는 않는" 유형일 수 있습니다.</div>"""
+
+    if not corr_html and not fwd_html:
+        return ""
+
+    return f"""
+  <div class="card">
+    <h2>PER-주가 상관관계 분석</h2>
+    {corr_html}
+    {fwd_html}
+  </div>"""
 
 
 # --------------------------------------------------------------------- 매수 타이밍 신호 (기술적 분석)
@@ -564,6 +730,47 @@ def line_chart_svg(history, key_idx, label, width=760, height=220):
     return "".join(parts)
 
 
+def index_dual_chart_svg(history, width=760, height=240):
+    """history: [(ym, price, per, pbr), ...]. 주가와 PER을 각각 첫 시점=100으로 지수화해서
+    같은 축(0~) 위에 두 선으로 겹쳐 그린다 (듀얼축 대신 지수화 - dataviz 규칙 준수)."""
+    valid = [(i, price, per) for i, (ym, price, per, pbr) in enumerate(history) if per is not None]
+    if len(valid) < 3:
+        return "<p class='muted'>차트를 그리기엔 데이터가 부족합니다.</p>"
+    base_price = valid[0][1]
+    base_per = valid[0][2]
+    if not base_price or not base_per:
+        return "<p class='muted'>차트를 그리기엔 데이터가 부족합니다.</p>"
+    price_idx = [(i, price / base_price * 100) for i, price, per in valid]
+    per_idx = [(i, per / base_per * 100) for i, price, per in valid]
+    ys_all = [v for _, v in price_idx] + [v for _, v in per_idx]
+    y_min, y_max = min(ys_all) * 0.95, max(ys_all) * 1.05
+    n = len(history)
+    SM = {"left": 46, "right": 20, "top": 16, "bottom": 30}
+    plot_w = width - SM["left"] - SM["right"]
+    plot_h = height - SM["top"] - SM["bottom"]
+
+    def lx(i):
+        return SM["left"] + (i / max(n - 1, 1)) * plot_w
+
+    def ly(v):
+        return SM["top"] + plot_h - (v - y_min) / (y_max - y_min) * plot_h
+
+    price_pts = " ".join(f"{lx(i):.1f},{ly(v):.1f}" for i, v in price_idx)
+    per_pts = " ".join(f"{lx(i):.1f},{ly(v):.1f}" for i, v in per_idx)
+    base_y = ly(100)
+    parts = [f'<svg class="linechart" viewBox="0 0 {width} {height}" width="100%" height="{height}">']
+    for frac in (0, 0.25, 0.5, 0.75, 1.0):
+        gy = SM["top"] + plot_h * frac
+        parts.append(f'<line x1="{SM["left"]}" y1="{gy:.1f}" x2="{width-SM["right"]}" y2="{gy:.1f}" class="grid"/>')
+    parts.append(f'<line x1="{SM["left"]}" y1="{base_y:.1f}" x2="{width-SM["right"]}" y2="{base_y:.1f}" class="avgline" stroke-dasharray="4,4"/>')
+    parts.append(f'<polyline points="{price_pts}" fill="none" class="series-line"/>')
+    parts.append(f'<polyline points="{per_pts}" fill="none" class="series-line-2"/>')
+    parts.append(f'<text x="{SM["left"]}" y="{height-6}" class="axis-label">{history[0][0]}</text>')
+    parts.append(f'<text x="{width-SM["right"]}" y="{height-6}" text-anchor="end" class="axis-label">{history[-1][0]}</text>')
+    parts.append('</svg>')
+    return "".join(parts)
+
+
 def swing_chart_svg(dates, values, mark_indices, title_fmt, width=760, height=160):
     """일별 시계열(가격 또는 OBV)을 그리고, mark_indices의 두 지점(이전/최근 스윙)을 점으로 표시."""
     n = len(values)
@@ -615,19 +822,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .viz-root {{
     color-scheme: light;
     --surface-1: #fcfcfb; --page: #f9f9f7; --text-primary: #0b0b0b; --text-secondary: #52514e;
-    --muted: #898781; --grid: #e1e0d9; --series-1: #2a78d6; --border: rgba(11,11,11,0.10);
+    --muted: #898781; --grid: #e1e0d9; --series-1: #2a78d6; --series-2: #eb6834; --border: rgba(11,11,11,0.10);
   }}
   @media (prefers-color-scheme: dark) {{
     :root:where(:not([data-theme="light"])) .viz-root {{
       color-scheme: dark;
       --surface-1: #1a1a19; --page: #0d0d0d; --text-primary: #ffffff; --text-secondary: #c3c2b7;
-      --muted: #898781; --grid: #2c2c2a; --series-1: #3987e5; --border: rgba(255,255,255,0.10);
+      --muted: #898781; --grid: #2c2c2a; --series-1: #3987e5; --series-2: #d95926; --border: rgba(255,255,255,0.10);
     }}
   }}
   :root[data-theme="dark"] .viz-root {{
     color-scheme: dark;
     --surface-1: #1a1a19; --page: #0d0d0d; --text-primary: #ffffff; --text-secondary: #c3c2b7;
-    --muted: #898781; --grid: #2c2c2a; --series-1: #3987e5; --border: rgba(255,255,255,0.10);
+    --muted: #898781; --grid: #2c2c2a; --series-1: #3987e5; --series-2: #d95926; --border: rgba(255,255,255,0.10);
   }}
   * {{ box-sizing: border-box; }}
   body {{ margin:0; font-family: system-ui,-apple-system,"Segoe UI",sans-serif; background: var(--page); color: var(--text-primary); }}
@@ -650,8 +857,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .avgline {{ stroke: var(--muted); stroke-width: 1.5; }}
   .avg-label {{ font-size: 10px; fill: var(--muted); }}
   .series-line {{ stroke: var(--series-1); stroke-width: 2; }}
+  .series-line-2 {{ stroke: var(--series-2); stroke-width: 2; }}
   .series-dot {{ fill: var(--series-1); stroke: var(--surface-1); stroke-width: 2; }}
   .cur-label {{ font-size: 11px; font-weight:700; fill: var(--series-1); }}
+  .chart-legend {{ display:flex; gap:16px; font-size: 11.5px; color: var(--text-secondary); margin: 6px 0 4px; }}
+  .chart-legend .dot {{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:middle; }}
   .axis-label {{ font-size: 10px; fill: var(--muted); }}
   .muted {{ color: var(--muted); font-size: 13px; }}
   .notes {{ font-size: 12.5px; color: var(--text-secondary); line-height: 1.7; }}
@@ -701,6 +911,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
   </div>
 
+  {investor_flow_section}
+
   <div class="card">
     <h2>PER (주가수익비율) — 과거 {n_months}개월 대비</h2>
     <div class="stat-grid" style="grid-template-columns: repeat(3,1fr);">
@@ -714,6 +926,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
     {per_chart}
   </div>
+
+  {per_price_corr_section}
 
   <div class="card">
     <h2>PBR (주가순자산비율) — 과거 {n_months}개월 대비</h2>
@@ -761,6 +975,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <li>"과거 급등 이벤트 백테스트"의 이벤트는 실제 뉴스/실적 캘린더가 아니라 "하루 등락률+거래량이
         동시에 크게 튄 날"을 호재의 대리 지표로 삼아 자동 탐지한 것입니다. 표본 수가 적을 수 있고,
         과거 패턴이 미래에 반복된다는 보장도 없습니다. 참고 지표로만 활용하세요.</li>
+      <li>"PER-주가 상관관계"는 PER=주가÷EPS라는 정의상 같은 회계연도 구간 안에서는 기계적으로
+        연동되는 성격이 있어, 상관계수 자체보다 "PER 구간별 이후 수익률"(사후편향 없이 과거 시점
+        기준으로 계산)이 더 실질적인 정보입니다. 표본이 적은 종목은 구간별 결과가 들쭉날쭉할 수
+        있습니다.</li>
+      <li>"외국인·프로그램매매 수급"의 당일 수치는 KIS 실시간 스냅샷이라 신뢰할 수 있지만, 최근
+        추이 조회는 상대적으로 검증이 덜 된 API라 조회에 실패하면 그 부분만 조용히 생략될 수
+        있습니다.</li>
     </ul>
   </div>
 
@@ -796,6 +1017,94 @@ def fmt_signed_pct(v):
         return "N/A"
     sign = "+" if v >= 0 else ""
     return f"{sign}{v*100:.1f}%"
+
+
+# --------------------------------------------------------------------- 외국인·프로그램매매 수급
+# 당일 스냅샷(외국인 보유율/순매수, 프로그램매매 순매수)은 현재가 조회(quote) 응답에 이미 들어있는
+# 필드라 항상 신뢰할 수 있다. 최근 며칠간의 추이는 별도 엔드포인트(get_investor_trend)를 추가로
+# 호출해야 하는데, 이 엔드포인트는 다른 것들만큼 실전 검증을 못 해봤다 - 응답 스키마가 다르면
+# 그 부분만 조용히 생략되고(예외로 잡힘) 당일 스냅샷은 정상 표시된다.
+
+def render_investor_flow_section(quote, investor_trend_body=None):
+    def to_float(v):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    frgn_ehrt_v = to_float(quote.get("hts_frgn_ehrt"))
+    frgn_ntby_v = to_float(quote.get("frgn_ntby_qty"))
+    pgtr_ntby_v = to_float(quote.get("pgtr_ntby_qty"))
+
+    if frgn_ehrt_v is None and frgn_ntby_v is None:
+        return ""  # quote에 관련 필드 자체가 없으면 섹션 생략
+
+    def qty_badge(v):
+        if v is None:
+            return "N/A", "#898781"
+        if v > 0:
+            return f"+{v:,.0f}주 (순매수)", "#0ca30c"
+        if v < 0:
+            return f"{v:,.0f}주 (순매도)", "#d03b3b"
+        return "0주 (보합)", "#898781"
+
+    frgn_text, frgn_color = qty_badge(frgn_ntby_v)
+    pgtr_text, pgtr_color = qty_badge(pgtr_ntby_v)
+
+    snapshot_html = f"""
+    <div class="stat-grid" style="grid-template-columns: repeat(3,1fr);">
+      <div class="stat-tile"><div class="label">외국인 보유율</div><div class="value">{f"{frgn_ehrt_v:.2f}%" if frgn_ehrt_v is not None else 'N/A'}</div></div>
+      <div class="stat-tile"><div class="label">당일 외국인 순매수</div><div class="value" style="font-size:15px;color:{frgn_color}">{frgn_text}</div></div>
+      <div class="stat-tile"><div class="label">당일 프로그램매매 순매수</div><div class="value" style="font-size:15px;color:{pgtr_color}">{pgtr_text}</div></div>
+    </div>"""
+
+    trend_html = ""
+    try:
+        rows = investor_trend_body.get("output", []) if investor_trend_body else []
+        parsed = []
+        for r in rows:
+            d = r.get("stck_bsop_date")
+            f = r.get("frgn_ntby_qty")
+            if d and f not in (None, ""):
+                parsed.append((d, float(f)))
+        if len(parsed) >= 2:
+            parsed.sort()
+            recent = parsed[-20:]
+            n_days = len(recent)
+            n_buy_days = sum(1 for _, v in recent if v > 0)
+            cum = sum(v for _, v in recent)
+            cum_text, cum_color = qty_badge(cum)
+            max_abs = max(abs(v) for _, v in recent) or 1
+            bar_rows = []
+            for d, v in recent[-10:]:
+                w = abs(v) / max_abs * 100
+                color = "#0ca30c" if v > 0 else "#d03b3b" if v < 0 else "#898781"
+                bar_rows.append(
+                    f'<div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);">'
+                    f'<span style="width:52px;">{d[4:6]}/{d[6:8]}</span>'
+                    f'<div style="flex:1;background:var(--page);border-radius:3px;height:10px;">'
+                    f'<div style="width:{w:.0f}%;background:{color};height:10px;border-radius:3px;"></div></div>'
+                    f'<span style="width:76px;text-align:right;color:{color};">{v:+,.0f}주</span></div>'
+                )
+            trend_html = f"""
+    <div class="tech-subtitle">최근 {n_days}거래일 외국인 순매수 추이 (그중 순매수일 {n_buy_days}일)</div>
+    <div class="corr-range">누적 순매수: <span style="color:{cum_color};font-weight:700;">{cum_text}</span></div>
+    <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px;">
+      {''.join(bar_rows)}
+    </div>"""
+    except Exception:
+        trend_html = ""
+
+    if not trend_html:
+        trend_html = ('<div class="muted" style="margin-top:10px;">최근 며칠간 추이 데이터는 조회하지 못했습니다 '
+                        '(오늘자 스냅샷만 표시 - 리포트의 다른 부분에는 영향 없습니다).</div>')
+
+    return f"""
+  <div class="card">
+    <h2>외국인·프로그램매매 수급</h2>
+    {snapshot_html}
+    {trend_html}
+  </div>"""
 
 
 # --------------------------------------------------------------------- 애널리스트 목표주가 (수동 입력)
@@ -1082,7 +1391,7 @@ def render_event_backtest_section(code, daily_bars):
   </div>"""
 
 
-def build_report(code, name, quote, annual, bars, daily_bars=None):
+def build_report(code, name, quote, annual, bars, daily_bars=None, investor_trend=None):
     history = build_history(annual, bars)
     n_months = len(history)
     if n_months < 6:
@@ -1113,6 +1422,8 @@ def build_report(code, name, quote, annual, bars, daily_bars=None):
     technical_section = render_technical_signal_section(daily_bars)
     analyst_section = render_analyst_target_section(code, price)
     event_backtest_section = render_event_backtest_section(code, daily_bars)
+    per_price_corr_section = render_per_price_correlation_section(history)
+    investor_flow_section = render_investor_flow_section(quote, investor_trend)
 
     from datetime import datetime
     snapshot_date = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -1126,6 +1437,7 @@ def build_report(code, name, quote, annual, bars, daily_bars=None):
         per_gauge=per_gauge, pbr_gauge=pbr_gauge, per_chart=per_chart, pbr_chart=pbr_chart,
         export_corr_section=export_corr_section, technical_section=technical_section,
         analyst_section=analyst_section, event_backtest_section=event_backtest_section,
+        per_price_corr_section=per_price_corr_section, investor_flow_section=investor_flow_section,
     )
     return html, verdict, composite_pct
 
@@ -1171,7 +1483,12 @@ def main():
         print(f"  [안내] 일봉 데이터 조회에 실패해 '매수 타이밍 신호' 섹션은 생략합니다: {e}")
         daily_bars = None
 
-    html, verdict, composite_pct = build_report(code, name, quote["output"], annual, bars, daily_bars)
+    try:
+        _, investor_trend = _call_with_retry(get_investor_trend, token, appkey, appsecret, code)
+    except Exception:
+        investor_trend = None
+
+    html, verdict, composite_pct = build_report(code, name, quote["output"], annual, bars, daily_bars, investor_trend)
 
     out_filename = f"개미는뚠뚠_리포트_{code}.html"
     with open(out_filename, "w", encoding="utf-8") as f:
