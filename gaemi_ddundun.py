@@ -12,6 +12,14 @@
 상관관계 분석도 추가로 붙는다 - 전체기간/2024년이후/2025년이후 상관계수를
 자동 계산해서 보여준다.
 
+또한 "매수 타이밍 신호" 섹션이 추가로 붙는다 - 최근 일봉 데이터(약 13개월치)를
+받아서 거래량(OBV) 다이버전스와 RSI 다이버전스를 자동으로 탐지한다. 이건 위의
+PER/PBR 밸류에이션 판단과는 완전히 별개의 기술적/모멘텀 신호다: 밸류에이션은
+"과거 대비 비싸다/싸다"를 말해주고, 이 신호는 "지금 추세가 꺾일 조짐이 있는가"를
+말해준다. 둘 다 참고용이며, 특히 다이버전스는 확정적 매수/매도 신호가 아니라
+패턴 기반 참고 지표이므로 실제 매매는 손절 기준 등 별도의 리스크 관리와 함께
+판단할 것.
+
 HOW TO RUN
   같은 cmd 창에 KIS_APPKEY / KIS_APPSECRET 이 이미 set 되어 있으면:
     python3 gaemi_ddundun.py 011070 LG이노텍
@@ -24,6 +32,10 @@ HOW TO RUN
     009150(삼성전기): customs_mlcc.json, customs_camera.json
     011070(LG이노텍): customs_camera.json, customs_pcb_c.json
   파일이 없으면 그 섹션은 자동으로 생략되고 나머지 리포트는 정상 생성된다.
+
+  증권사 목표주가/선행 밸류에이션까지 보려면 같은 폴더에 analyst_targets.json이 있어야 함
+  (KIS API로 자동 조회되는 게 아니라, 증권사 리포트를 보고 직접 입력/갱신하는 파일 - 형식은
+  파일 안 예시 참고). 파일이 없거나 해당 종목 항목이 없으면 그 섹션은 자동으로 생략된다.
 
 OUTPUT
   개미는뚠뚠_리포트_<종목코드>.html  - 더블클릭하면 브라우저에서 바로 열림
@@ -168,6 +180,35 @@ def get_price_history(token, appkey, appsecret, symbol, start, end, period="M"):
     return r.status_code, r.json()
 
 
+def get_daily_bars_chunked(token, appkey, appsecret, symbol, lookback_days=400, chunk_days=95):
+    """일봉 데이터는 한 번의 호출로 lookback_days 전체를 못 받아올 수 있어서(회신 건수 제한),
+    최근 날짜부터 chunk_days 단위로 거슬러 올라가며 여러 번 호출해 합친다.
+    반환: [{"date": "YYYYMMDD", "close": float, "volume": float}, ...] 날짜 오름차순, 중복 제거됨."""
+    from datetime import datetime, timedelta
+    fmt = "%Y%m%d"
+    end_dt = datetime.now()
+    start_dt = end_dt - timedelta(days=lookback_days)
+    by_date = {}
+    cursor_end = end_dt
+    while cursor_end >= start_dt:
+        cursor_start = max(start_dt, cursor_end - timedelta(days=chunk_days))
+        s_str, e_str = cursor_start.strftime(fmt), cursor_end.strftime(fmt)
+        try:
+            _, body = _call_with_retry(get_price_history, token, appkey, appsecret, symbol, s_str, e_str, "D")
+        except Exception:
+            body = None
+        if isinstance(body, dict):
+            for b in body.get("output2", []):
+                d = b.get("stck_bsop_date")
+                close = b.get("stck_clpr")
+                vol = b.get("acml_vol")
+                if d and close not in (None, "") and vol not in (None, ""):
+                    by_date[d] = {"date": d, "close": float(close), "volume": float(vol)}
+        time.sleep(0.7)
+        cursor_end = cursor_start - timedelta(days=1)
+    return [by_date[d] for d in sorted(by_date)]
+
+
 # --------------------------------------------------------------------- 방법론
 
 def known_fy(year, month):
@@ -303,6 +344,138 @@ def corr_verdict(r):
     return "무의미", "#898781"
 
 
+# --------------------------------------------------------------------- 매수 타이밍 신호 (기술적 분석)
+# 밸류에이션(PER/PBR)과는 별개의 신호. 최근 일봉 데이터에서 가격의 스윙 저점/고점을 찾고,
+# 그 지점에서 거래량(OBV)과 모멘텀(RSI)이 가격과 같은 방향인지 반대 방향인지(다이버전스)를 본다.
+# - 강세(불리시) 다이버전스: 가격은 저점을 낮추는데 OBV/RSI는 저점을 높임 -> 매도 압력 약화 신호
+# - 약세(베어리시) 다이버전스: 가격은 고점을 높이는데 OBV/RSI는 고점을 낮춤 -> 상승 동력 약화 신호
+# 확정적 매매 신호가 아니라 패턴 기반 참고 지표임을 리포트에 항상 명시한다.
+
+def compute_rsi(closes, period=14):
+    """Wilder's RSI. closes: 날짜 오름차순 종가 리스트. 반환: 같은 길이의 리스트, 앞쪽 period개는 None."""
+    n = len(closes)
+    rsis = [None] * n
+    if n <= period:
+        return rsis
+    gains = [max(closes[i] - closes[i - 1], 0) for i in range(1, n)]
+    losses = [max(closes[i - 1] - closes[i], 0) for i in range(1, n)]
+    avg_gain = sum(gains[:period]) / period
+    avg_loss = sum(losses[:period]) / period
+    rsis[period] = 100.0 if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss)
+    for i in range(period + 1, n):
+        avg_gain = (avg_gain * (period - 1) + gains[i - 1]) / period
+        avg_loss = (avg_loss * (period - 1) + losses[i - 1]) / period
+        rsis[i] = 100.0 if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss)
+    return rsis
+
+
+def compute_obv(closes, volumes):
+    """On-Balance Volume: 종가가 오른 날은 거래량을 더하고 내린 날은 뺀다 (누적)."""
+    obv = [0.0] * len(closes)
+    for i in range(1, len(closes)):
+        if closes[i] > closes[i - 1]:
+            obv[i] = obv[i - 1] + volumes[i]
+        elif closes[i] < closes[i - 1]:
+            obv[i] = obv[i - 1] - volumes[i]
+        else:
+            obv[i] = obv[i - 1]
+    return obv
+
+
+def moving_average(values, period):
+    if len(values) < period:
+        return None
+    return sum(values[-period:]) / period
+
+
+def find_swing_points(values, order=5):
+    """values 안에서 앞뒤 order개 구간 내 국소 최소/최대인 지점을 스윙 저점/고점으로 판단.
+    반환: [(index, value, "low"|"high"), ...] 인덱스 오름차순."""
+    n = len(values)
+    swings = []
+    for i in range(order, n - order):
+        window = values[i - order:i + order + 1]
+        if values[i] == min(window) and window.count(values[i]) == 1:
+            swings.append((i, values[i], "low"))
+        elif values[i] == max(window) and window.count(values[i]) == 1:
+            swings.append((i, values[i], "high"))
+    return swings
+
+
+def detect_divergence(dates, closes, obv, rsi, order=5):
+    """가장 최근의 유의미한 스윙 저점 쌍 또는 고점 쌍(둘 중 더 최근에 발생한 쪽)을 비교해
+    가격 vs 거래량(OBV)/모멘텀(RSI) 다이버전스 여부를 판단."""
+    swings = find_swing_points(closes, order=order)
+    lows = [s for s in swings if s[2] == "low"]
+    highs = [s for s in swings if s[2] == "high"]
+
+    candidates = []
+    if len(lows) >= 2:
+        candidates.append(("bullish_check", lows[-2], lows[-1]))
+    if len(highs) >= 2:
+        candidates.append(("bearish_check", highs[-2], highs[-1]))
+    if not candidates:
+        return {"type": None, "signals": {}, "points": None}
+
+    candidates.sort(key=lambda c: c[2][0])  # 더 최근에 발생한(인덱스 큰) 스윙 쌍 우선
+    kind, p1, p2 = candidates[-1]
+    i1, price1, _ = p1
+    i2, price2, _ = p2
+
+    result = {"type": None, "signals": {"obv": None, "rsi": None}, "points": {
+        "date1": dates[i1], "price1": price1, "obv1": obv[i1], "rsi1": rsi[i1],
+        "date2": dates[i2], "price2": price2, "obv2": obv[i2], "rsi2": rsi[i2],
+    }}
+
+    if kind == "bullish_check" and price2 < price1:
+        result["type"] = "bullish"
+        result["signals"]["obv"] = obv[i2] > obv[i1]
+        result["signals"]["rsi"] = rsi[i2] is not None and rsi[i1] is not None and rsi[i2] > rsi[i1]
+    elif kind == "bearish_check" and price2 > price1:
+        result["type"] = "bearish"
+        result["signals"]["obv"] = obv[i2] < obv[i1]
+        result["signals"]["rsi"] = rsi[i2] is not None and rsi[i1] is not None and rsi[i2] < rsi[i1]
+
+    return result
+
+
+def divergence_verdict(result):
+    """(제목, 색상, 설명문) 반환."""
+    if result["type"] is None:
+        return ("다이버전스 신호 없음", "#898781",
+                "최근 데이터에서 비교할 만한 스윙 저점/고점 쌍을 찾지 못했습니다 (뚜렷한 추세 전환 지점이 아직 없음).")
+
+    obv_sig, rsi_sig = result["signals"]["obv"], result["signals"]["rsi"]
+    n_confirm = sum(1 for s in (obv_sig, rsi_sig) if s)
+
+    if result["type"] == "bullish":
+        if n_confirm == 2:
+            return ("강세 다이버전스 포착 (거래량+모멘텀 동반)", "#0ca30c",
+                    "주가는 직전 저점보다 더 낮은 저점을 만들었지만, 거래량(OBV)과 RSI는 오히려 저점을 "
+                    "높였습니다. 가격 하락에 비해 매도 압력(거래량)과 하락 모멘텀이 약해지고 있다는 뜻으로, "
+                    "저가 매수를 고려해볼 만한 구간이라는 신호입니다.")
+        if n_confirm == 1:
+            which = "거래량(OBV)" if obv_sig else "RSI"
+            return (f"약한 강세 다이버전스 ({which}만 확인)", "#fab219",
+                    f"주가는 저점을 낮췄지만 {which} 지표만 저점을 높였습니다. 두 지표가 함께 확인돼야 "
+                    "신호가 더 신뢰할 만한데, 지금은 하나만 확인돼 강도가 약합니다.")
+        return ("다이버전스 없음 (하락 동반 확인)", "#898781",
+                "주가와 거래량(OBV)·RSI가 함께 저점을 낮추고 있어, 아직 매도 압력이 이어지고 있는 것으로 "
+                "보입니다. 저가매수 타이밍으로 보기엔 이릅니다.")
+
+    # bearish
+    if n_confirm == 2:
+        return ("약세 다이버전스 포착 (거래량+모멘텀 동반)", "#d03b3b",
+                "주가는 직전 고점보다 더 높은 고점을 만들었지만, 거래량(OBV)과 RSI는 오히려 고점을 "
+                "낮췄습니다. 가격 상승에 비해 매수 강도가 약해지고 있다는 뜻으로, 상승 동력 둔화 신호입니다.")
+    if n_confirm == 1:
+        which = "거래량(OBV)" if obv_sig else "RSI"
+        return (f"약한 약세 다이버전스 ({which}만 확인)", "#fab219",
+                f"주가는 고점을 높였지만 {which} 지표만 고점을 낮췄습니다. 신호 강도는 약합니다.")
+    return ("다이버전스 없음 (상승 동반 확인)", "#0ca30c",
+            "주가와 거래량(OBV)·RSI가 함께 고점을 높이고 있어, 상승 추세가 아직 건강해 보입니다.")
+
+
 # --------------------------------------------------------------------- HTML/SVG
 
 def gauge_svg(pct, verdict, width=520, height=64):
@@ -362,6 +535,47 @@ def line_chart_svg(history, key_idx, label, width=760, height=220):
     parts.append(f'<text x="{lx(last_i):.1f}" y="{ly(last_v)-10:.1f}" text-anchor="end" class="cur-label">현재 {last_v:.1f}</text>')
     parts.append(f'<text x="{SM["left"]}" y="{height-6}" class="axis-label">{history[0][0]}</text>')
     parts.append(f'<text x="{width-SM["right"]}" y="{height-6}" text-anchor="end" class="axis-label">{history[-1][0]}</text>')
+    parts.append('</svg>')
+    return "".join(parts)
+
+
+def swing_chart_svg(dates, values, mark_indices, title_fmt, width=760, height=160):
+    """일별 시계열(가격 또는 OBV)을 그리고, mark_indices의 두 지점(이전/최근 스윙)을 점으로 표시."""
+    n = len(values)
+    if n < 3:
+        return "<p class='muted'>차트를 그리기엔 데이터가 부족합니다.</p>"
+    y_min, y_max = min(values), max(values)
+    pad = (y_max - y_min) * 0.1 or abs(y_max) * 0.1 or 1
+    y_min, y_max = y_min - pad, y_max + pad
+    SM = {"left": 60, "right": 20, "top": 16, "bottom": 22}
+    plot_w = width - SM["left"] - SM["right"]
+    plot_h = height - SM["top"] - SM["bottom"]
+
+    def lx(i):
+        return SM["left"] + (i / max(n - 1, 1)) * plot_w
+
+    def ly(v):
+        return SM["top"] + plot_h - (v - y_min) / (y_max - y_min) * plot_h
+
+    pts = " ".join(f"{lx(i):.1f},{ly(v):.1f}" for i, v in enumerate(values))
+    parts = [f'<svg class="linechart" viewBox="0 0 {width} {height}" width="100%" height="{height}">']
+    for frac in (0, 0.5, 1.0):
+        gy = SM["top"] + plot_h * frac
+        parts.append(f'<line x1="{SM["left"]}" y1="{gy:.1f}" x2="{width-SM["right"]}" y2="{gy:.1f}" class="grid"/>')
+    parts.append(f'<polyline points="{pts}" fill="none" class="series-line"/>')
+    mark_colors = ["#898781", "#2a78d6"]
+    for k, i in enumerate(mark_indices):
+        if i is None or i >= n:
+            continue
+        cx, cy = lx(i), ly(values[i])
+        color = mark_colors[min(k, len(mark_colors) - 1)]
+        parts.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="5" fill="{color}" stroke="var(--surface-1)" stroke-width="2"/>')
+        label = title_fmt(dates[i], values[i])
+        anchor = "start" if k == 0 else "end"
+        dx = 8 if k == 0 else -8
+        parts.append(f'<text x="{cx+dx:.1f}" y="{cy-10:.1f}" text-anchor="{anchor}" class="cur-label" style="fill:{color}">{label}</text>')
+    parts.append(f'<text x="{SM["left"]}" y="{height-6}" class="axis-label">{dates[0]}</text>')
+    parts.append(f'<text x="{width-SM["right"]}" y="{height-6}" text-anchor="end" class="axis-label">{dates[-1]}</text>')
     parts.append('</svg>')
     return "".join(parts)
 
@@ -427,6 +641,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .corr-table th {{ color: var(--muted); font-weight: 600; font-size: 11px; }}
   .corr-badge {{ display:inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight:700; color:#fff; }}
   .corr-range {{ color: var(--muted); font-size: 11px; margin: -2px 0 8px; }}
+  .tech-explain {{ font-size: 12.5px; color: var(--text-secondary); line-height: 1.6; margin: 8px 0 16px; }}
+  .tech-legend {{ font-size: 11px; color: var(--muted); margin: 2px 0 10px; }}
+  .tech-legend .dot {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }}
+  .tech-subtitle {{ font-size: 12.5px; color: var(--text-secondary); font-weight:600; margin: 18px 0 6px; }}
   @media (max-width: 560px) {{
     .viz-root {{ padding: 20px 14px 36px; }}
     h1 {{ font-size: 19px; }}
@@ -486,6 +704,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     {pbr_chart}
   </div>
 
+  {analyst_section}
+
+  {technical_section}
+
   {export_corr_section}
 
   <div class="card">
@@ -500,6 +722,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <li>표본이 {n_months}개월로 크지 않을 수 있어 참고 지표로만 활용하세요. 사업 구조가 크게 바뀐
         기업은 오래된 과거 평균이 왜곡 신호를 줄 수 있습니다.</li>
       <li>PER은 적자 구간(음수 EPS)에서 의미가 없어 해당 월은 자동 제외됩니다.</li>
+      <li>"매수 타이밍 신호"(다이버전스)는 위 밸류에이션 판단과 완전히 별개입니다. 밸류에이션이
+        "매우고평가"여도 반도체 사이클처럼 이익 개선이 기대되는 국면에서는 기술적으로 매수세 전환
+        신호가 먼저 나타날 수 있습니다. 반대로 밸류에이션이 싸도 다이버전스 없이 계속 하락할 수도
+        있습니다.</li>
+      <li>다이버전스는 확정적 매매 신호가 아니라 패턴 기반 참고 지표입니다. 실제 매수 시에는 분할매수,
+        손절 기준(예: 직전 저점 이탈 시 손절) 등 별도의 리스크 관리 규칙과 함께 사용하세요.</li>
+      <li>"애널리스트 목표주가 &amp; 선행 밸류에이션"은 KIS API가 아니라 사용자가 증권사 리포트를 보고
+        직접 입력한 값입니다. 리포트 발행 시점 기준 데이터라 시간이 지나면 낡을 수 있으니, 표시된
+        증권사·시점을 꼭 함께 확인하세요. 목표주가는 해당 증권사의 전망치일 뿐 실현을 보장하지 않습니다.</li>
     </ul>
   </div>
 
@@ -528,6 +759,84 @@ def fmt_gap(cur, avg):
 
 def fmt_r(r):
     return f"{r:.2f}" if r is not None else "-"
+
+
+# --------------------------------------------------------------------- 애널리스트 목표주가 (수동 입력)
+# analyst_targets.json (같은 폴더)에 사용자가 증권사 리포트를 보고 직접 입력해두는 데이터.
+# KIS API로 자동 조회되는 값이 아니다 - 새 리포트가 나오면 이 파일을 직접 갱신해야 반영된다.
+# customs_<label>.json과 같은 패턴: 파일이 없거나 해당 종목 항목이 없으면 섹션 자체가 생략된다.
+
+def load_analyst_targets(code):
+    fname = "analyst_targets.json"
+    if not os.path.exists(fname):
+        return []
+    try:
+        with open(fname, encoding="utf-8") as f:
+            d = json.load(f)
+    except Exception:
+        return []
+    return d.get(code, [])
+
+
+def render_analyst_target_section(code, current_price):
+    entries = load_analyst_targets(code)
+    if not entries:
+        return ""
+
+    blocks = []
+    for e in entries:
+        broker = e.get("broker", "-")
+        etype = e.get("type")
+
+        if etype == "target_price":
+            target_price = e.get("target_price")
+            metric = e.get("metric", "")
+            target_year = e.get("target_year", "")
+            target_multiple = e.get("target_multiple")
+            note = e.get("note", "")
+            upside = (target_price - current_price) / current_price if target_price and current_price else None
+            if upside is None:
+                badge_text, badge_color = "N/A", "#898781"
+            else:
+                badge_text = f"{'업사이드' if upside >= 0 else '다운사이드'} {fmt_pct(abs(upside))}"
+                badge_color = "#0ca30c" if upside >= 0 else "#d03b3b"
+            blocks.append(f"""
+    <div class="corr-product">
+      <h3>{broker} <span class="corr-badge" style="background:{badge_color}">{badge_text}</span></h3>
+      <div class="corr-range">목표주가 {target_price:,.0f}원 ({target_year}년 {metric} {target_multiple}배 기준) · 현재가 {current_price:,.0f}원 대비</div>
+      {f'<div class="tech-explain">{note}</div>' if note else ''}
+    </div>""")
+
+        elif etype == "fwd_multiple_band":
+            metric = e.get("metric", "")
+            horizon = e.get("horizon", "")
+            cur_v = e.get("current_value")
+            avg_v = e.get("historical_avg")
+            band_note = e.get("band_note", "")
+            gap = (cur_v - avg_v) / avg_v if (cur_v is not None and avg_v) else None
+            if gap is None:
+                badge_text, badge_color = "N/A", "#898781"
+            elif gap > 0:
+                badge_text, badge_color = "평균 대비 고평가", "#d03b3b"
+            else:
+                badge_text, badge_color = "평균 대비 저평가", "#0ca30c"
+            blocks.append(f"""
+    <div class="corr-product">
+      <h3>{broker} <span class="corr-badge" style="background:{badge_color}">{badge_text}</span></h3>
+      <div class="corr-range">{horizon} {metric} {cur_v}배 vs 과거평균 {avg_v}배 ({fmt_gap(cur_v, avg_v)}){' · ' + band_note if band_note else ''}</div>
+    </div>""")
+
+    if not blocks:
+        return ""
+
+    return f"""
+  <div class="card">
+    <h2>애널리스트 목표주가 &amp; 선행 밸류에이션 (수동 입력)</h2>
+    <div class="muted" style="margin-bottom:14px;">증권사 리포트를 보고 사용자가 직접 입력한 데이터입니다
+    (analyst_targets.json 파일을 수정하면 갱신됩니다). KIS API로 실시간 조회되는 값이 아니라 입력 시점
+    기준이니 날짜를 확인하세요. 업사이드는 위 목표주가와 KIS 실시간 현재가를 비교해 자동 계산됩니다.</div>
+    {''.join(blocks)}
+  </div>"""
 
 
 def render_export_corr_section(code, bars):
@@ -587,7 +896,79 @@ def render_export_corr_section(code, bars):
   </div>"""
 
 
-def build_report(code, name, quote, annual, bars):
+def render_technical_signal_section(daily_bars):
+    """daily_bars: get_daily_bars_chunked() 반환값 (날짜 오름차순 [{"date","close","volume"}, ...]).
+    데이터가 없거나 너무 적으면 빈 문자열(섹션 생략)."""
+    MIN_BARS = 40
+    if not daily_bars or len(daily_bars) < MIN_BARS:
+        return ""
+
+    dates = [b["date"] for b in daily_bars]
+    closes = [b["close"] for b in daily_bars]
+    volumes = [b["volume"] for b in daily_bars]
+    obv = compute_obv(closes, volumes)
+    rsi = compute_rsi(closes, period=14)
+
+    result = detect_divergence(dates, closes, obv, rsi, order=5)
+    title, color, explain = divergence_verdict(result)
+
+    def fmt_date(d):
+        return f"{d[4:6]}/{d[6:8]}"
+
+    cur_price = closes[-1]
+    ma20 = moving_average(closes, 20)
+    ma60 = moving_average(closes, 60)
+    cur_rsi = next((v for v in reversed(rsi) if v is not None), None)
+    rsi_zone = "-"
+    if cur_rsi is not None:
+        rsi_zone = "과매수(70+)" if cur_rsi >= 70 else "과매도(30-)" if cur_rsi <= 30 else "중립"
+
+    def ma_badge(price, ma):
+        if ma is None:
+            return "N/A"
+        return f"{ma:,.0f}원 ({'현재가 상회' if price >= ma else '현재가 하회'})"
+
+    charts_html = ""
+    table_html = ""
+    if result["points"]:
+        p = result["points"]
+        i1 = dates.index(p["date1"])
+        i2 = dates.index(p["date2"])
+        price_chart = swing_chart_svg(dates, closes, [i1, i2],
+                                       lambda d, v: f"{fmt_date(d)} {v:,.0f}원")
+        obv_chart = swing_chart_svg(dates, obv, [i1, i2],
+                                     lambda d, v: f"{fmt_date(d)} {v:,.0f}")
+        point_label = "저점" if result["type"] == "bullish" else "고점"
+        charts_html = f"""
+    <div class="tech-subtitle">주가 추이 (직전 {point_label} <span style="color:#898781">●</span> vs 최근 {point_label} <span style="color:#2a78d6">●</span>)</div>
+    {price_chart}
+    <div class="tech-subtitle">OBV(거래량 누적지표) 추이 — 같은 두 시점 비교</div>
+    {obv_chart}
+    <table class="corr-table" style="margin-top:10px;">
+      <tr><th>시점</th><th>날짜</th><th>종가</th><th>OBV</th><th>RSI(14)</th></tr>
+      <tr><td>직전 {point_label}</td><td>{p['date1']}</td><td>{p['price1']:,.0f}원</td><td>{p['obv1']:,.0f}</td><td>{f"{p['rsi1']:.0f}" if p['rsi1'] is not None else '-'}</td></tr>
+      <tr><td>최근 {point_label}</td><td>{p['date2']}</td><td>{p['price2']:,.0f}원</td><td>{p['obv2']:,.0f}</td><td>{f"{p['rsi2']:.0f}" if p['rsi2'] is not None else '-'}</td></tr>
+    </table>"""
+
+    return f"""
+  <div class="card">
+    <h2>매수 타이밍 신호 (기술적 분석 — 다이버전스)</h2>
+    <div class="verdict-row">
+      <span class="corr-badge" style="background:{color}; font-size:14px; padding:6px 14px;">{title}</span>
+    </div>
+    <div class="tech-explain">{explain}</div>
+    <div class="stat-grid" style="grid-template-columns: repeat(4,1fr);">
+      <div class="stat-tile"><div class="label">현재가</div><div class="value">{cur_price:,.0f}원</div></div>
+      <div class="stat-tile"><div class="label">20일 이동평균</div><div class="value" style="font-size:14px;">{ma_badge(cur_price, ma20)}</div></div>
+      <div class="stat-tile"><div class="label">60일 이동평균</div><div class="value" style="font-size:14px;">{ma_badge(cur_price, ma60)}</div></div>
+      <div class="stat-tile"><div class="label">RSI(14)</div><div class="value">{f"{cur_rsi:.0f}" if cur_rsi is not None else 'N/A'} <span style="font-size:11px;color:var(--muted);">{rsi_zone}</span></div></div>
+    </div>
+    {charts_html}
+    <div class="tech-legend">일봉 {len(daily_bars)}개 ({dates[0]} ~ {dates[-1]}) 기준 · 이 신호는 위 밸류에이션(PER/PBR) 판단과 별개입니다.</div>
+  </div>"""
+
+
+def build_report(code, name, quote, annual, bars, daily_bars=None):
     history = build_history(annual, bars)
     n_months = len(history)
     if n_months < 6:
@@ -615,6 +996,8 @@ def build_report(code, name, quote, annual, bars):
     per_chart = f'<div class="gauge-title">PER 추이 (과거 {n_months}개월)</div>' + line_chart_svg(history, 2, "PER")
     pbr_chart = f'<div class="gauge-title">PBR 추이 (과거 {n_months}개월)</div>' + line_chart_svg(history, 3, "PBR")
     export_corr_section = render_export_corr_section(code, bars)
+    technical_section = render_technical_signal_section(daily_bars)
+    analyst_section = render_analyst_target_section(code, price)
 
     from datetime import datetime
     snapshot_date = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -626,7 +1009,8 @@ def build_report(code, name, quote, annual, bars):
         avg_per=fmt_x(avg_per), avg_pbr=fmt_x(avg_pbr),
         per_gap=fmt_gap(cur_per, avg_per), pbr_gap=fmt_gap(cur_pbr, avg_pbr),
         per_gauge=per_gauge, pbr_gauge=pbr_gauge, per_chart=per_chart, pbr_chart=pbr_chart,
-        export_corr_section=export_corr_section,
+        export_corr_section=export_corr_section, technical_section=technical_section,
+        analyst_section=analyst_section,
     )
     return html, verdict, composite_pct
 
@@ -657,12 +1041,22 @@ def main():
         sys.exit("연간 재무비율(EPS/BPS) 데이터를 찾을 수 없습니다. 종목코드를 확인해주세요.")
     time.sleep(0.5)
 
-    _, ph = _call_with_retry(get_price_history, token, appkey, appsecret, code, "20190101", "20260814", "M")
+    from datetime import datetime as _dt
+    end_str = _dt.now().strftime("%Y%m%d")
+    _, ph = _call_with_retry(get_price_history, token, appkey, appsecret, code, "20190101", end_str, "M")
     bars = ph.get("output2", [])
     if len(bars) < 6:
         sys.exit(f"월별 주가 데이터가 {len(bars)}개월뿐입니다. 종목코드를 확인해주세요.")
+    time.sleep(0.5)
 
-    html, verdict, composite_pct = build_report(code, name, quote["output"], annual, bars)
+    print("매수 타이밍 신호용 일봉 데이터 조회 중... (여러 번 호출해서 시간이 조금 걸립니다)")
+    try:
+        daily_bars = get_daily_bars_chunked(token, appkey, appsecret, code, lookback_days=400)
+    except Exception as e:
+        print(f"  [안내] 일봉 데이터 조회에 실패해 '매수 타이밍 신호' 섹션은 생략합니다: {e}")
+        daily_bars = None
+
+    html, verdict, composite_pct = build_report(code, name, quote["output"], annual, bars, daily_bars)
 
     out_filename = f"개미는뚠뚠_리포트_{code}.html"
     with open(out_filename, "w", encoding="utf-8") as f:

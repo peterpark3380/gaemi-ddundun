@@ -130,7 +130,12 @@ def report():
         if len(bars) < 6:
             return SEARCH_PAGE.format(error_html='<div class="error">월별 주가 데이터가 부족합니다.</div>')
 
-        html, verdict, composite_pct = core.build_report(code, name, quote["output"], annual, bars)
+        try:
+            daily_bars = core.get_daily_bars_chunked(token, appkey, appsecret, code, lookback_days=400)
+        except Exception:
+            daily_bars = None
+
+        html, verdict, composite_pct = core.build_report(code, name, quote["output"], annual, bars, daily_bars)
         return Response(html, mimetype="text/html")
 
     except SystemExit as e:
