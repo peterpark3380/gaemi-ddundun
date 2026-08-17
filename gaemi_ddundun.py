@@ -19,6 +19,10 @@ PER/PBR 밸류에이션 판단과는 완전히 별개의 기술적/모멘텀 신
 말해준다. 둘 다 참고용이며, 특히 다이버전스는 확정적 매수/매도 신호가 아니라
 패턴 기반 참고 지표이므로 실제 매매는 손절 기준 등 별도의 리스크 관리와 함께
 판단할 것.
+  이 섹션 안에 "보조 지표 확인" 체크리스트도 함께 붙는다 - 다이버전스와는 다른
+  성격의 지표 3개(MACD 골든/데드크로스, 20일/60일 이동평균 골든/데드크로스,
+  볼린저밴드 %B)를 각각 따로 보여주고 그중 몇 개가 매수 우호적인지만 요약한다.
+  (하나의 점수로 억지로 합치지 않음 - 서로 다른 걸 보는 지표라서.)
 
 HOW TO RUN
   같은 cmd 창에 KIS_APPKEY / KIS_APPSECRET 이 이미 set 되어 있으면:
@@ -561,6 +565,178 @@ def moving_average(values, period):
     return sum(values[-period:]) / period
 
 
+def moving_average_series(values, period):
+    """values 전체 구간에 대한 period일 단순이동평균 시계열. 앞쪽 (period-1)개는 None.
+    (moving_average()는 '지금 시점의 값 하나'만 주는데, 골든/데드크로스를 판단하려면
+    과거 시점들의 이동평균도 필요해서 별도로 둠.)"""
+    n = len(values)
+    ma = [None] * n
+    if n < period:
+        return ma
+    window_sum = sum(values[:period])
+    ma[period - 1] = window_sum / period
+    for i in range(period, n):
+        window_sum += values[i] - values[i - period]
+        ma[i] = window_sum / period
+    return ma
+
+
+def find_last_cross(line_a, line_b):
+    """line_a가 line_b를 상향돌파(골든크로스)/하향돌파(데드크로스)한 가장 최근 지점을 찾는다.
+    반환: (index, "golden"|"dead") 또는 None (교차 이력이 없거나 데이터 부족)."""
+    last = None
+    for i in range(1, len(line_a)):
+        a0, b0, a1, b1 = line_a[i - 1], line_b[i - 1], line_a[i], line_b[i]
+        if a0 is None or b0 is None or a1 is None or b1 is None:
+            continue
+        if a0 <= b0 and a1 > b1:
+            last = (i, "golden")
+        elif a0 >= b0 and a1 < b1:
+            last = (i, "dead")
+    return last
+
+
+def compute_ema(values, period):
+    """지수이동평균(EMA). 앞쪽 (period-1)개는 None. MACD 계산의 재료."""
+    n = len(values)
+    ema = [None] * n
+    if n < period:
+        return ema
+    k = 2 / (period + 1)
+    ema[period - 1] = sum(values[:period]) / period
+    for i in range(period, n):
+        ema[i] = values[i] * k + ema[i - 1] * (1 - k)
+    return ema
+
+
+def compute_macd(closes, fast=12, slow=26, signal=9):
+    """MACD선 = EMA(fast) - EMA(slow), 시그널선 = MACD선의 EMA(signal), 히스토그램 = MACD선-시그널선.
+    가격 이동평균(단순 추세)과는 별개로 '모멘텀의 가속/감속'을 보는 지표라 RSI/OBV 다이버전스를
+    보완한다 - 다이버전스가 '지금까지의' 힘 빠짐을 보는 거라면, MACD 크로스는 '방향 전환' 타이밍을
+    조금 더 직접적으로 짚어준다.
+    반환: (macd_line, signal_line, histogram) 각각 closes와 같은 길이."""
+    n = len(closes)
+    ema_fast = compute_ema(closes, fast)
+    ema_slow = compute_ema(closes, slow)
+    macd_line = [None] * n
+    for i in range(n):
+        if ema_fast[i] is not None and ema_slow[i] is not None:
+            macd_line[i] = ema_fast[i] - ema_slow[i]
+    valid_start = next((i for i, v in enumerate(macd_line) if v is not None), None)
+    signal_line = [None] * n
+    histogram = [None] * n
+    if valid_start is not None:
+        sig_valid = compute_ema(macd_line[valid_start:], signal)
+        for j, v in enumerate(sig_valid):
+            signal_line[valid_start + j] = v
+        for i in range(n):
+            if macd_line[i] is not None and signal_line[i] is not None:
+                histogram[i] = macd_line[i] - signal_line[i]
+    return macd_line, signal_line, histogram
+
+
+def compute_bollinger(closes, period=20, num_std=2):
+    """볼린저밴드: 중심선=단순이동평균(period), 상/하단=중심선 ± num_std*표준편차.
+    %B = (종가-하단)/(상단-하단) : 0=하단터치, 0.5=중심선, 1=상단터치.
+    가격이 '자기 최근 변동성 대비' 어디쯤 있는지를 보여줘서, 다이버전스가 없어도 통계적으로
+    과매도/과매수 구간인지 참고할 수 있다.
+    반환: (mid, upper, lower, percent_b) 각각 closes와 같은 길이."""
+    n = len(closes)
+    mid, upper, lower, percent_b = [None] * n, [None] * n, [None] * n, [None] * n
+    for i in range(period - 1, n):
+        window = closes[i - period + 1:i + 1]
+        m = sum(window) / period
+        sd = statistics.pstdev(window)
+        u, l = m + num_std * sd, m - num_std * sd
+        mid[i], upper[i], lower[i] = m, u, l
+        if u != l:
+            percent_b[i] = (closes[i] - l) / (u - l)
+    return mid, upper, lower, percent_b
+
+
+def macd_state(macd_line, signal_line, histogram):
+    """MACD 현재 상태 -> (라벨, 색상, 설명).
+    관측 구간 내에 실제 교차 시점이 없는 경우(예: 관측 시작 시점부터 이미 한쪽이 계속 우위인 추세)에도
+    "데이터 부족"으로 뭉개지 않고 현재 우위 상태를 그대로 보여준다 - find_swing_points의 대칭적 확인
+    요구 때문에 최근 저점/고점을 놓쳤던 것과 같은 종류의 함정이라, 여기서도 같은 원칙을 적용."""
+    hist_vals = [v for v in histogram if v is not None]
+    if not hist_vals:
+        return ("데이터 부족", "#898781", "MACD를 계산하기엔 데이터가 부족합니다.")
+    # 히스토그램 절대값(모멘텀 격차의 크기) 기준 확대/축소 - 골든크로스든 데드크로스든 "가속/감속" 의미가
+    # 일관되게 통하도록. (단순히 값 자체가 늘었는지만 보면, 음수 구간에서 -5 -> -3처럼 0에 가까워지는
+    # 것도 "확대"로 잘못 읽히게 된다.)
+    hist_trend = "확대" if len(hist_vals) >= 2 and abs(hist_vals[-1]) > abs(hist_vals[-2]) else "축소"
+    cross = find_last_cross(macd_line, signal_line)
+    cur_hist = hist_vals[-1]
+
+    if cross is None:
+        if cur_hist >= 0:
+            color = "#0ca30c" if hist_trend == "확대" else "#5fbf5f"
+            return ("MACD 우위 지속 (교차 이력 없음)", color,
+                    f"관측 구간 내내 MACD가 시그널선 위에 있습니다 (교차 시점은 데이터 범위 밖). "
+                    f"히스토그램이 {hist_trend}되는 중입니다.")
+        color = "#d03b3b" if hist_trend == "확대" else "#fab219"
+        return ("시그널선 우위 지속 (교차 이력 없음)", color,
+                f"관측 구간 내내 MACD가 시그널선 아래에 있습니다 (교차 시점은 데이터 범위 밖). "
+                f"히스토그램이 {hist_trend}되는 중입니다.")
+
+    cross_i, cross_type = cross
+    days_since = (len(histogram) - 1) - cross_i
+    if cross_type == "golden":
+        color = "#0ca30c" if hist_trend == "확대" else "#fab219"
+        explain = (f"MACD가 시그널선을 상향 돌파(골든크로스)한 지 {days_since}거래일째이고, "
+                   f"히스토그램(모멘텀 격차)이 {hist_trend}되는 중입니다.")
+        if hist_trend == "축소":
+            explain += " 상승 모멘텀이 둔화되는 신호일 수 있어 주의가 필요합니다."
+        return (f"골든크로스 {days_since}일째 ({hist_trend})", color, explain)
+    color = "#d03b3b" if hist_trend == "확대" else "#fab219"
+    explain = (f"MACD가 시그널선을 하향 돌파(데드크로스)한 지 {days_since}거래일째이고, "
+               f"히스토그램이 {hist_trend}되는 중입니다.")
+    if hist_trend == "축소":
+        explain += " 하락 모멘텀이 약해지고 있어 반등 초기 신호일 가능성도 참고해볼 만합니다."
+    return (f"데드크로스 {days_since}일째 ({hist_trend})", color, explain)
+
+
+def ma_cross_state(ma_short, ma_long, short_label="20일선", long_label="60일선"):
+    """단기/장기 이동평균 정배열·역배열 및 골든/데드크로스 -> (라벨, 색상, 설명)."""
+    cross = find_last_cross(ma_short, ma_long)
+    if cross is None:
+        last_s = next((v for v in reversed(ma_short) if v is not None), None)
+        last_l = next((v for v in reversed(ma_long) if v is not None), None)
+        if last_s is None or last_l is None:
+            return ("데이터 부족", "#898781", "이동평균을 계산하기엔 데이터가 부족합니다.")
+        if last_s >= last_l:
+            return ("정배열", "#0ca30c", f"{short_label}이 {long_label} 위에 있습니다 (관측 구간 내 교차 이력 없음).")
+        return ("역배열", "#d03b3b", f"{short_label}이 {long_label} 아래에 있습니다 (관측 구간 내 교차 이력 없음).")
+    cross_i, cross_type = cross
+    days_since = (len(ma_short) - 1) - cross_i
+    if cross_type == "golden":
+        return (f"골든크로스 {days_since}일전", "#0ca30c",
+                f"{short_label}이 {long_label}을 위로 돌파한 지 {days_since}거래일째입니다. 중기 추세가 상승 전환했다는 신호입니다.")
+    return (f"데드크로스 {days_since}일전", "#d03b3b",
+            f"{short_label}이 {long_label}을 아래로 돌파한 지 {days_since}거래일째입니다. 중기 추세가 하락 전환했다는 신호입니다.")
+
+
+def bollinger_state(percent_b):
+    """현재 %B 값 -> (라벨, 색상, 설명, 현재%B값)."""
+    cur = next((v for v in reversed(percent_b) if v is not None), None)
+    if cur is None:
+        return ("데이터 부족", "#898781", "볼린저밴드를 계산하기엔 데이터가 부족합니다.", None)
+    if cur <= 0.05:
+        return ("하단밴드 터치/이탈 (과매도권)", "#0ca30c",
+                "주가가 최근 변동성 기준 밴드 하단에 근접·이탈했습니다. 통계적으로 평균에서 많이 벗어난 "
+                "구간이라 단기 반등 가능성을 참고할 만하지만, 추세가 강하면 계속 하단을 따라 내려갈 수도 있습니다.", cur)
+    if cur >= 0.95:
+        return ("상단밴드 터치/이탈 (과매수권)", "#d03b3b",
+                "주가가 최근 변동성 기준 밴드 상단에 근접·이탈했습니다. 단기 과열 구간일 수 있지만, "
+                "추세가 강하면 계속 상단을 따라 올라갈 수도 있습니다.", cur)
+    if cur <= 0.2:
+        return ("밴드 하단권", "#5fbf5f", "볼린저밴드 하단권에 위치해 있습니다.", cur)
+    if cur >= 0.8:
+        return ("밴드 상단권", "#fab219", "볼린저밴드 상단권에 위치해 있습니다.", cur)
+    return ("밴드 중심권", "#898781", "밴드 중심 부근으로 특별한 과열·침체 신호가 없습니다.", cur)
+
+
 def find_swing_points(values, order=5):
     """values 안에서 앞뒤 order개 구간 내 국소 최소/최대인 지점을 스윙 저점/고점으로 판단.
     반환: [(index, value, "low"|"high"), ...] 인덱스 오름차순."""
@@ -819,6 +995,85 @@ def swing_chart_svg(dates, values, mark_indices, title_fmt, width=760, height=16
     return "".join(parts)
 
 
+def macd_chart_svg(dates, macd_line, signal_line, histogram, width=760, height=130, hist_height=64):
+    """MACD선+시그널선 패널과 히스토그램(막대) 패널을 위아래로 나눠서 그린다.
+    히스토그램(MACD-시그널)의 값 크기는 MACD선 자체보다 훨씬 작은 게 보통이라(특히 주가 레벨이 커서
+    EMA 격차가 큰 종목), 한 축에 같이 그리면 막대가 거의 안 보이는 문제가 있었다. dataviz 규칙상
+    '한 차트에 y축 두 개'는 금지지만 '차트 자체를 두 개로 나누는 것'은 허용되므로, 각자 자기 값
+    범위에 맞게 독립적으로 스케일링해서 해결."""
+    n = len(macd_line)
+    valid_idx = [i for i in range(n) if macd_line[i] is not None and signal_line[i] is not None]
+    if len(valid_idx) < 3:
+        return "<p class='muted'>차트를 그리기엔 데이터가 부족합니다.</p>"
+    start = valid_idx[0]
+    span = (n - 1 - start) or 1
+    SM = {"left": 60, "right": 20, "top": 14, "bottom": 20}
+    plot_w = width - SM["left"] - SM["right"]
+
+    def lx(i):
+        return SM["left"] + ((i - start) / span) * plot_w
+
+    # --- 패널 1: MACD선 vs 시그널선 ---
+    plot_h = height - SM["top"] - SM["bottom"]
+    line_vals = [macd_line[i] for i in valid_idx] + [signal_line[i] for i in valid_idx]
+    y_min, y_max = min(line_vals), max(line_vals)
+    pad = (y_max - y_min) * 0.1 or abs(y_max) * 0.1 or 1
+    y_min, y_max = y_min - pad, y_max + pad
+
+    def ly(v):
+        return SM["top"] + plot_h - (v - y_min) / (y_max - y_min) * plot_h
+
+    parts = [f'<svg class="linechart" viewBox="0 0 {width} {height}" width="100%" height="{height}">']
+    for frac in (0, 0.5, 1.0):
+        gy = SM["top"] + plot_h * frac
+        parts.append(f'<line x1="{SM["left"]}" y1="{gy:.1f}" x2="{width-SM["right"]}" y2="{gy:.1f}" class="grid"/>')
+    if y_min <= 0 <= y_max:
+        zy = ly(0)
+        parts.append(f'<line x1="{SM["left"]}" y1="{zy:.1f}" x2="{width-SM["right"]}" y2="{zy:.1f}" class="avgline" stroke-dasharray="4,4"/>')
+    macd_pts = " ".join(f"{lx(i):.1f},{ly(macd_line[i]):.1f}" for i in valid_idx)
+    signal_pts = " ".join(f"{lx(i):.1f},{ly(signal_line[i]):.1f}" for i in valid_idx)
+    parts.append(f'<polyline points="{macd_pts}" fill="none" class="series-line"/>')
+    parts.append(f'<polyline points="{signal_pts}" fill="none" class="series-line-2"/>')
+    parts.append(f'<text x="{SM["left"]}" y="{height-6}" class="axis-label">{dates[start]}</text>')
+    parts.append(f'<text x="{width-SM["right"]}" y="{height-6}" text-anchor="end" class="axis-label">{dates[-1]}</text>')
+    parts.append('</svg>')
+    line_svg = "".join(parts)
+
+    # --- 패널 2: 히스토그램(MACD-시그널) 막대 ---
+    hist_valid = [i for i in valid_idx if histogram[i] is not None]
+    hist_svg = "<p class='muted'>히스토그램을 그리기엔 데이터가 부족합니다.</p>"
+    if hist_valid:
+        hplot_h = hist_height - SM["top"] - SM["bottom"]
+        hv = [histogram[i] for i in hist_valid]
+        hy_min, hy_max = min(hv), max(hv)
+        hpad = (hy_max - hy_min) * 0.15 or abs(hy_max) * 0.15 or 1
+        hy_min, hy_max = hy_min - hpad, hy_max + hpad
+
+        def hly(v):
+            return SM["top"] + hplot_h - (v - hy_min) / (hy_max - hy_min) * hplot_h
+
+        hzero_y = hly(0)
+        hparts = [f'<svg class="linechart" viewBox="0 0 {width} {hist_height}" width="100%" height="{hist_height}">']
+        hparts.append(f'<line x1="{SM["left"]}" y1="{hzero_y:.1f}" x2="{width-SM["right"]}" y2="{hzero_y:.1f}" class="grid"/>')
+        bar_w = max(plot_w / max(len(hist_valid), 1) * 0.6, 1)
+        for i in hist_valid:
+            x = lx(i)
+            h = histogram[i]
+            hv_y = hly(h)
+            # SVG y좌표는 아래로 갈수록 커지므로, 막대의 top(y)은 두 좌표 중 작은 쪽,
+            # height는 둘의 차이(절대값)로 계산해야 한다 (그냥 zero_y를 기준으로 잡으면
+            # 양수 히스토그램에서 y2-y1이 음수가 돼 0에 가까운 높이로 찌그러지는 버그가 생김).
+            rect_y = min(hzero_y, hv_y)
+            rect_h = max(abs(hv_y - hzero_y), 0.8)
+            color = "#0ca30c" if h >= 0 else "#d03b3b"
+            hparts.append(f'<rect x="{x-bar_w/2:.1f}" y="{rect_y:.1f}" width="{bar_w:.1f}" height="{rect_h:.1f}" fill="{color}" opacity="0.75"/>')
+        hparts.append(f'<text x="{SM["left"]}" y="{hist_height-6}" class="axis-label">히스토그램(MACD-시그널)</text>')
+        hparts.append('</svg>')
+        hist_svg = "".join(hparts)
+
+    return line_svg + hist_svg
+
+
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -976,6 +1231,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         있습니다.</li>
       <li>다이버전스는 확정적 매매 신호가 아니라 패턴 기반 참고 지표입니다. 실제 매수 시에는 분할매수,
         손절 기준(예: 직전 저점 이탈 시 손절) 등 별도의 리스크 관리 규칙과 함께 사용하세요.</li>
+      <li>"보조 지표 확인"의 MACD/이동평균크로스/볼린저밴드는 다이버전스와 계산 방식이 완전히 다른
+        지표들이라 하나의 점수로 합치지 않고 각각 따로 보여줍니다. 여러 지표가 동시에 매수 우호적일수록
+        참고할 만하지만, 넷 다 같은 원리(과거 가격·거래량 패턴)에서 파생된 지표라 서로 독립적인
+        증거는 아닙니다 - 완전히 다른 정보(뉴스, 실적, 수급)로 교차 확인하는 것을 권장합니다.</li>
       <li>"애널리스트 목표주가 &amp; 선행 밸류에이션"은 KIS API가 아니라 사용자가 증권사 리포트를 보고
         직접 입력한 값입니다. 리포트 발행 시점 기준 데이터라 시간이 지나면 낡을 수 있으니, 표시된
         증권사·시점을 꼭 함께 확인하세요. 목표주가는 해당 증권사의 전망치일 뿐 실현을 보장하지 않습니다.</li>
@@ -1251,7 +1510,18 @@ def render_export_corr_section(code, bars):
 
 def render_technical_signal_section(daily_bars):
     """daily_bars: get_daily_bars_chunked() 반환값 (날짜 오름차순 [{"date","close","volume"}, ...]).
-    데이터가 없거나 너무 적으면 빈 문자열(섹션 생략)."""
+    데이터가 없거나 너무 적으면 빈 문자열(섹션 생략).
+
+    핵심 신호는 여전히 OBV/RSI 다이버전스(가장 검증해본 로직)지만, 그것 하나만으로 "매수 타이밍"을
+    판단하면 다이버전스가 아예 안 잡히는 국면(뚜렷한 스윙 저점/고점이 아직 없는 애매한 구간)에서는
+    아무 참고도 못 준다는 한계가 있었다. 그래서 성격이 다른 보조 지표 3개를 추가해 "보조 지표 확인"
+    체크리스트로 보여준다:
+      - MACD 골든/데드크로스 + 히스토그램 방향 (모멘텀 가속/감속, 방향 전환 타이밍)
+      - 20일/60일 이동평균 골든/데드크로스 (중기 추세 방향)
+      - 볼린저밴드 %B (최근 변동성 대비 지금 위치 - 통계적 과매도/과매수)
+    네 지표를 억지로 하나의 숫자 점수로 합치지는 않는다 (각기 다른 걸 보는 지표라 단순 합산은 의미가
+    옅어짐) - 대신 각각을 있는 그대로 보여주고, 그중 몇 개가 매수에 우호적인 상태인지만 요약 배지로
+    보여줘서 "이 신호는 확실하다"가 아니라 "여러 각도에서 봤을 때 지금이 어떤 국면인가"를 참고하게 한다."""
     MIN_BARS = 40
     if not daily_bars or len(daily_bars) < MIN_BARS:
         return ""
@@ -1282,7 +1552,6 @@ def render_technical_signal_section(daily_bars):
         return f"{ma:,.0f}원 ({'현재가 상회' if price >= ma else '현재가 하회'})"
 
     charts_html = ""
-    table_html = ""
     if result["points"]:
         p = result["points"]
         i1 = dates.index(p["date1"])
@@ -1303,9 +1572,63 @@ def render_technical_signal_section(daily_bars):
       <tr><td>최근 {point_label}</td><td>{p['date2']}</td><td>{p['price2']:,.0f}원</td><td>{p['obv2']:,.0f}</td><td>{f"{p['rsi2']:.0f}" if p['rsi2'] is not None else '-'}</td></tr>
     </table>"""
 
+    # ---- 보조 지표: MACD ----
+    macd_line, signal_line, histogram = compute_macd(closes)
+    macd_label, macd_color, macd_explain = macd_state(macd_line, signal_line, histogram)
+    hist_vals = [v for v in histogram if v is not None]
+    hist_expanding = len(hist_vals) >= 2 and abs(hist_vals[-1]) > abs(hist_vals[-2])
+    cur_hist = hist_vals[-1] if hist_vals else None
+    # 실제 교차 이벤트가 관측 구간 밖에 있어도(추세 시작부터 한쪽이 계속 우위) 지금 MACD가 시그널선
+    # 위/아래인지, 그 격차가 커지는 중인지로 매수/매도 우호 여부를 판단 (교차 유무에만 의존하지 않음).
+    macd_bullish = bool(cur_hist is not None and cur_hist >= 0 and hist_expanding)
+    macd_bearish = bool(cur_hist is not None and cur_hist < 0 and hist_expanding)
+    macd_chart_html = ""
+    if hist_vals:
+        macd_chart_html = f"""
+    <div class="tech-subtitle">MACD (12/26/9)</div>
+    <div class="chart-legend">
+      <span><span class="dot" style="background:var(--series-1)"></span>MACD선</span>
+      <span><span class="dot" style="background:var(--series-2)"></span>시그널선</span>
+      <span><span class="dot" style="background:#0ca30c"></span>히스토그램(+)</span>
+      <span><span class="dot" style="background:#d03b3b"></span>히스토그램(-)</span>
+    </div>
+    {macd_chart_svg(dates, macd_line, signal_line, histogram)}"""
+
+    # ---- 보조 지표: 20일/60일 이동평균 골든/데드크로스 ----
+    ma20_series = moving_average_series(closes, 20)
+    ma60_series = moving_average_series(closes, 60)
+    ma_label, ma_color, ma_explain = ma_cross_state(ma20_series, ma60_series)
+    ma_cross = find_last_cross(ma20_series, ma60_series)
+    ma_bullish = ma_cross is not None and ma_cross[1] == "golden"
+    ma_bearish = ma_cross is not None and ma_cross[1] == "dead"
+
+    # ---- 보조 지표: 볼린저밴드 %B ----
+    _, bb_upper, bb_lower, percent_b = compute_bollinger(closes, 20, 2)
+    bb_label, bb_color, bb_explain, cur_pb = bollinger_state(percent_b)
+    bb_bullish = cur_pb is not None and cur_pb <= 0.2
+    bb_bearish = cur_pb is not None and cur_pb >= 0.8
+
+    div_bullish = result["type"] == "bullish" and sum(1 for s in result["signals"].values() if s) >= 1
+    div_bearish = result["type"] == "bearish" and sum(1 for s in result["signals"].values() if s) >= 1
+
+    checklist = [
+        ("OBV/RSI 다이버전스", title, color, explain, div_bullish, div_bearish),
+        ("MACD 크로스", macd_label, macd_color, macd_explain, macd_bullish, macd_bearish),
+        ("이동평균(20일/60일) 크로스", ma_label, ma_color, ma_explain, ma_bullish, ma_bearish),
+        ("볼린저밴드 %B", bb_label + (f" ({cur_pb*100:.0f}%)" if cur_pb is not None else ""), bb_color, bb_explain, bb_bullish, bb_bearish),
+    ]
+    n_bullish = sum(1 for _, _, _, _, b, _ in checklist if b)
+    n_bearish = sum(1 for _, _, _, _, _, b in checklist if b)
+    summary_color = "#0ca30c" if n_bullish >= 3 else "#fab219" if n_bullish >= 2 else "#898781"
+    checklist_rows = "".join(
+        f"""<tr><td>{name}</td><td><span class="corr-badge" style="background:{c}">{label}</span></td>
+        <td style="font-size:12px; color:var(--text-secondary);">{exp}</td></tr>"""
+        for name, label, c, exp, _, _ in checklist
+    )
+
     return f"""
   <div class="card">
-    <h2>매수 타이밍 신호 (기술적 분석 — 다이버전스)</h2>
+    <h2>매수 타이밍 신호 (기술적 분석)</h2>
     <div class="verdict-row">
       <span class="corr-badge" style="background:{color}; font-size:14px; padding:6px 14px;">{title}</span>
     </div>
@@ -1317,6 +1640,19 @@ def render_technical_signal_section(daily_bars):
       <div class="stat-tile"><div class="label">RSI(14)</div><div class="value">{f"{cur_rsi:.0f}" if cur_rsi is not None else 'N/A'} <span style="font-size:11px;color:var(--muted);">{rsi_zone}</span></div></div>
     </div>
     {charts_html}
+
+    <div class="tech-subtitle" style="margin-top:22px;">보조 지표 확인 (다이버전스와 별개 관점 3개 추가)</div>
+    <div class="verdict-row" style="margin-bottom:8px;">
+      <span class="corr-badge" style="background:{summary_color};">4개 지표 중 매수 우호적 {n_bullish}개 · 매도 우호적 {n_bearish}개</span>
+    </div>
+    <table class="corr-table">
+      <tr><th>지표</th><th>현재 상태</th><th>설명</th></tr>
+      {checklist_rows}
+    </table>
+    {macd_chart_html}
+    <div class="tech-explain" style="margin-top:12px;">위 4개는 서로 다른 방식으로 계산되는 지표라(가격 스윙 vs 모멘텀 가속도 vs 추세방향 vs 변동성 위치)
+    일부러 하나의 점수로 합치지 않았습니다. 여러 지표가 동시에 매수 우호적일수록 참고할 만하지만, 그래도
+    확정적 매매 신호가 아니라 패턴 기반 참고 지표입니다.</div>
     <div class="tech-legend">일봉 {len(daily_bars)}개 ({dates[0]} ~ {dates[-1]}) 기준 · 이 신호는 위 밸류에이션(PER/PBR) 판단과 별개입니다.</div>
   </div>"""
 
