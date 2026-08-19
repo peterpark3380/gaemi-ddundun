@@ -19,11 +19,20 @@ gaemi_ddundun.py (로컬 CLI 버전)의 핵심 로직을 그대로 재사용해�
 
 import os
 from datetime import datetime
+from urllib.parse import quote as urlquote
 from flask import Flask, request, Response
 
 import gaemi_ddundun as core
 
 app = Flask(__name__)
+
+# 코드를 직접 입력하지 않아도 바로 눌러서 검색할 수 있는 관심종목 목록. 여기 추가하면 검색 페이지에
+# 버튼으로 뜬다 (kis_valuation_data.py의 STOCK_LIST와 맞춰둠 - 새 종목 추가하면 여기도 같이 추가).
+QUICK_STOCKS = [
+    ("005930", "삼성전자"), ("000660", "SK하이닉스"), ("009150", "삼성전기"),
+    ("011070", "LG이노텍"), ("009450", "경동나비엔"), ("035420", "NAVER"),
+    ("067310", "하나마이크론"), ("475150", "SK이터닉스"),
+]
 
 SEARCH_PAGE = """<!DOCTYPE html>
 <html lang="ko">
@@ -46,37 +55,61 @@ SEARCH_PAGE = """<!DOCTYPE html>
     body {{ background:#0d0d0d; color:#fff; }}
     .card {{ background:#1a1a19 !important; border-color: rgba(255,255,255,0.10) !important; }}
     input {{ background:#0d0d0d !important; color:#fff !important; border-color: rgba(255,255,255,0.2) !important; }}
+    .quick-btn {{ background:#0d0d0d !important; border-color: rgba(255,255,255,0.2) !important; color:#fff !important; }}
   }}
   .card {{ background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:16px; padding:32px 24px; max-width:380px; width:100%; text-align:center; }}
   .card h1 {{ font-size:26px; margin: 0 0 4px; }}
-  .card p {{ color:#898781; font-size:13px; margin: 0 0 24px; }}
+  .card p {{ color:#898781; font-size:13px; margin: 0 0 20px; }}
+  .quick-label {{ text-align:left; font-size:12px; color:#898781; margin: 4px 0 8px; }}
+  .quick-grid {{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:22px; }}
+  .quick-btn {{
+    flex: 1 1 calc(50% - 8px); font-size:13px; font-weight:600; padding:10px 8px; border-radius:10px;
+    border:1px solid #e1e0d9; background:#fff; color:#0b0b0b; text-decoration:none; cursor:pointer;
+  }}
+  .quick-btn:active {{ opacity:0.7; }}
+  .divider {{ display:flex; align-items:center; gap:10px; color:#898781; font-size:11px; margin: 4px 0 16px; }}
+  .divider::before, .divider::after {{ content:""; flex:1; height:1px; background:#e1e0d9; }}
   form {{ display:flex; flex-direction:column; gap:10px; }}
   input {{ font-size:16px; padding:12px 14px; border-radius:10px; border:1px solid #e1e0d9; }}
   button {{ font-size:16px; font-weight:700; padding:12px 14px; border-radius:10px; border:none; background:#2a78d6; color:#fff; cursor:pointer; }}
   button:active {{ opacity:0.85; }}
   .error {{ color:#d03b3b; font-size:13px; margin-top:14px; }}
-  .examples {{ margin-top:18px; font-size:11px; color:#898781; line-height:1.6; }}
 </style>
 </head>
 <body>
   <div class="card">
     <h1>🐜 개미는 뚠뚠</h1>
-    <p>종목코드를 검색하면 과거 대비 싼지 비싼지 알려드려요</p>
+    <p>종목코드를 몰라도 아래에서 바로 눌러서 검색할 수 있어요</p>
+    <div class="quick-label">관심종목 (눌러서 바로 검색)</div>
+    <div class="quick-grid">
+      {quick_buttons_html}
+    </div>
+    <div class="divider">또는 코드로 직접 검색</div>
     <form action="/report" method="get">
       <input name="code" placeholder="종목코드 6자리 (예: 005930)" required pattern="[0-9]{{6}}" maxlength="6" inputmode="numeric">
       <input name="name" placeholder="종목명 (선택, 예: 삼성전자)">
       <button type="submit">검색</button>
     </form>
     {error_html}
-    <div class="examples">005930 삼성전자 · 000660 SK하이닉스 · 009150 삼성전기 · 011070 LG이노텍</div>
   </div>
 </body>
 </html>"""
 
 
+def _quick_buttons_html():
+    return "\n".join(
+        f'<a class="quick-btn" href="/report?code={code}&name={urlquote(name)}">{name}</a>'
+        for code, name in QUICK_STOCKS
+    )
+
+
+def render_search_page(error_html=""):
+    return SEARCH_PAGE.format(error_html=error_html, quick_buttons_html=_quick_buttons_html())
+
+
 @app.route("/")
 def index():
-    return SEARCH_PAGE.format(error_html="")
+    return render_search_page()
 
 
 @app.route("/manifest.json")
@@ -101,34 +134,34 @@ def report():
     name = request.args.get("name", "").strip() or code
 
     if not code.isdigit() or len(code) != 6:
-        return SEARCH_PAGE.format(error_html='<div class="error">6자리 종목코드를 입력해주세요.</div>')
+        return render_search_page('<div class="error">6자리 종목코드를 입력해주세요.</div>')
 
     try:
         appkey, appsecret = os.environ.get("KIS_APPKEY"), os.environ.get("KIS_APPSECRET")
         if not appkey or not appsecret:
-            return SEARCH_PAGE.format(
-                error_html='<div class="error">서버에 KIS_APPKEY/KIS_APPSECRET이 설정되지 않았습니다. '
-                           '호스팅 서비스의 환경변수 설정을 확인해주세요.</div>'
+            return render_search_page(
+                '<div class="error">서버에 KIS_APPKEY/KIS_APPSECRET이 설정되지 않았습니다. '
+                '호스팅 서비스의 환경변수 설정을 확인해주세요.</div>'
             )
         token = core.get_access_token(appkey, appsecret)
 
         _, quote = core._call_with_retry(core.get_current_quote, token, appkey, appsecret, code)
         if quote.get("rt_cd") != "0" or not quote.get("output"):
             msg = quote.get("msg1", "알 수 없는 오류")
-            return SEARCH_PAGE.format(error_html=f'<div class="error">조회 실패: {msg} (종목코드를 확인해주세요)</div>')
+            return render_search_page(f'<div class="error">조회 실패: {msg} (종목코드를 확인해주세요)</div>')
 
         _, fr = core._call_with_retry(core.get_financial_ratio, token, appkey, appsecret, code)
         rows = fr.get("output", [])
         annual = {int(r["stac_yymm"][:4]): (float(r["eps"]), float(r["bps"]))
                   for r in rows if r["stac_yymm"][4:] == "12" and r.get("eps") and r.get("bps")}
         if not annual:
-            return SEARCH_PAGE.format(error_html='<div class="error">연간 재무비율 데이터를 찾을 수 없습니다.</div>')
+            return render_search_page('<div class="error">연간 재무비율 데이터를 찾을 수 없습니다.</div>')
 
         end_date = datetime.now().strftime("%Y%m%d")
         _, ph = core._call_with_retry(core.get_price_history, token, appkey, appsecret, code, "20190101", end_date, "M")
         bars = ph.get("output2", [])
         if len(bars) < 6:
-            return SEARCH_PAGE.format(error_html='<div class="error">월별 주가 데이터가 부족합니다.</div>')
+            return render_search_page('<div class="error">월별 주가 데이터가 부족합니다.</div>')
 
         try:
             daily_bars = core.get_daily_bars_chunked(token, appkey, appsecret, code, lookback_days=400)
@@ -140,13 +173,22 @@ def report():
         except Exception:
             investor_trend = None
 
-        html, verdict, composite_pct = core.build_report(code, name, quote["output"], annual, bars, daily_bars, investor_trend)
+        fred_api_key = os.environ.get("FRED_API_KEY")
+        macro_data = None
+        if fred_api_key:
+            try:
+                macro_data = core.fetch_macro_yield_data(fred_api_key)
+            except Exception:
+                macro_data = None
+
+        html, verdict, composite_pct = core.build_report(
+            code, name, quote["output"], annual, bars, daily_bars, investor_trend, macro_data)
         return Response(html, mimetype="text/html")
 
     except SystemExit as e:
-        return SEARCH_PAGE.format(error_html=f'<div class="error">{e}</div>')
+        return render_search_page(f'<div class="error">{e}</div>')
     except Exception as e:
-        return SEARCH_PAGE.format(error_html=f'<div class="error">오류가 발생했습니다: {e}</div>')
+        return render_search_page(f'<div class="error">오류가 발생했습니다: {e}</div>')
 
 
 if __name__ == "__main__":

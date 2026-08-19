@@ -363,6 +363,8 @@ def export_corr_analysis(bars, cdict):
         "단가": corr_for("unit_price"),
         "n": len(common),
         "range": (common[0], common[-1]),
+        "common_yms": common,
+        "price_by_ym": price_by_ym,
     }
 
 
@@ -954,6 +956,44 @@ def index_dual_chart_svg(history, width=760, height=240):
     return "".join(parts)
 
 
+def export_index_chart_svg(dates, price_vals, metric_vals, width=760, height=220):
+    """dates 공통 구간에서 주가와 관세청 수출입 지표(수출액/물량/단가 중 하나)를 각각 첫 시점=100으로
+    지수화해서 같은 축 위에 겹쳐 그린다 (PER-주가 비교 차트와 같은 지수화 기법 - dataviz 듀얼축 금지
+    규칙 준수). 상관계수 표 대신 두 선이 실제로 같이 움직이는지를 눈으로 바로 볼 수 있게 한다."""
+    n = len(dates)
+    if n < 3 or not price_vals[0] or not metric_vals[0]:
+        return "<p class='muted'>차트를 그리기엔 데이터가 부족합니다.</p>"
+    base_price, base_metric = price_vals[0], metric_vals[0]
+    price_idx = [v / base_price * 100 for v in price_vals]
+    metric_idx = [v / base_metric * 100 for v in metric_vals]
+    ys_all = price_idx + metric_idx
+    y_min, y_max = min(ys_all) * 0.95, max(ys_all) * 1.05
+    SM = {"left": 46, "right": 20, "top": 16, "bottom": 30}
+    plot_w = width - SM["left"] - SM["right"]
+    plot_h = height - SM["top"] - SM["bottom"]
+
+    def lx(i):
+        return SM["left"] + (i / max(n - 1, 1)) * plot_w
+
+    def ly(v):
+        return SM["top"] + plot_h - (v - y_min) / (y_max - y_min) * plot_h
+
+    price_pts = " ".join(f"{lx(i):.1f},{ly(v):.1f}" for i, v in enumerate(price_idx))
+    metric_pts = " ".join(f"{lx(i):.1f},{ly(v):.1f}" for i, v in enumerate(metric_idx))
+    base_y = ly(100)
+    parts = [f'<svg class="linechart" viewBox="0 0 {width} {height}" width="100%" height="{height}">']
+    for frac in (0, 0.25, 0.5, 0.75, 1.0):
+        gy = SM["top"] + plot_h * frac
+        parts.append(f'<line x1="{SM["left"]}" y1="{gy:.1f}" x2="{width-SM["right"]}" y2="{gy:.1f}" class="grid"/>')
+    parts.append(f'<line x1="{SM["left"]}" y1="{base_y:.1f}" x2="{width-SM["right"]}" y2="{base_y:.1f}" class="avgline" stroke-dasharray="4,4"/>')
+    parts.append(f'<polyline points="{price_pts}" fill="none" class="series-line"/>')
+    parts.append(f'<polyline points="{metric_pts}" fill="none" class="series-line-2"/>')
+    parts.append(f'<text x="{SM["left"]}" y="{height-6}" class="axis-label">{dates[0]}</text>')
+    parts.append(f'<text x="{width-SM["right"]}" y="{height-6}" text-anchor="end" class="axis-label">{dates[-1]}</text>')
+    parts.append('</svg>')
+    return "".join(parts)
+
+
 def swing_chart_svg(dates, values, mark_indices, title_fmt, width=760, height=160):
     """일별 시계열(가격 또는 OBV)을 그리고, mark_indices의 두 지점(이전/최근 스윙)을 점으로 표시."""
     n = len(values)
@@ -1173,7 +1213,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
   </div>
 
+  {macro_section}
+
   {investor_flow_section}
+
+  {spike_investor_section}
 
   <div class="card">
     <h2>PER (주가수익비율) — 과거 {n_months}개월 대비</h2>
@@ -1285,6 +1329,349 @@ def fmt_signed_pct(v):
     return f"{sign}{v*100:.1f}%"
 
 
+def fmt_pp_signed(v):
+    """이미 %(퍼센트) 단위인 값끼리의 차이(%p)를 부호 붙여 표시. 예: 0.48 -> '+0.48%p (48bp)'."""
+    if v is None:
+        return "N/A"
+    sign = "+" if v >= 0 else ""
+    return f"{sign}{v:.2f}%p ({sign}{v*100:.0f}bp)"
+
+
+# --------------------------------------------------------------------- 매크로 리스크 신호 (글로벌 장기채 금리)
+# KIS API와는 무관한 시장 전체(종목 무관) 신호. 미국 국채(10년물/2년물/3개월물, 그리고 장단기
+# 스프레드)는 세인트루이스 연준 FRED에서 매일 갱신되는 데이터를 받고, 독일(Bund)·일본(JGB)
+# 10년물은 FRED가 미러링하는 OECD "장기금리(Long-Term Interest Rate)" 시리즈를 쓴다(둘 다
+# 정의상 10년 만기 국채 수익률이며, 월별로 집계돼 통상 1~2개월 시차가 있다).
+#
+# 사용자가 짚은 문제의식: "장기채 금리가 단기채 금리보다 높아지면서(=장단기 역전이 풀리면서)
+# 주식시장에 안 좋은 영향을 준다" - 실제로 장단기 금리 역전(단기금리가 장기금리보다 높아지는 것)
+# 자체는 오래전부터 알려진 침체 선행지표지만, 역사적으로 주가 조정/침체가 실제로 시작된 시점은
+# "역전이 진행 중일 때"보다 "역전이 풀리고(스프레드가 다시 양수로 돌아오고) 있을 때"에 더 가까웠던
+# 사례가 많다(연준이 경기 둔화에 대응해 단기금리를 빠르게 내리면서 역전이 풀리는 경우가 전형적).
+# 그래서 이 섹션은 "지금 역전 상태인가"뿐 아니라 "최근에 역전이 풀렸는가"도 함께 본다.
+#
+# 이와 별개로, 장기금리 자체가 짧은 기간에 빠르게 오르는 것도 주식(특히 고밸류에이션 성장주)에는
+# 별도의 위험 신호다 - 할인율이 오르는 효과. 일본은 여기에 더해 오랫동안 초저금리(YCC)를 유지하다
+# 정상화하는 국면이라, JGB 금리 상승이 엔 캐리트레이드 청산 리스크(2024년 8월 사례처럼)로
+# 이어질 수 있다는 별도 맥락이 있어 설명을 덧붙인다.
+
+FRED_API_URL = "https://api.stlouisfed.org/fred/series/observations"
+MACRO_CACHE_FILE = "gaemi_ddundun_macro_cache.json"
+MACRO_CACHE_TTL_HOURS = 12
+
+FRED_SERIES = {
+    "us_10y": "DGS10",          # 미국 10년물 (일별)
+    "us_2y": "DGS2",            # 미국 2년물 (일별)
+    "us_3m": "DGS3MO",          # 미국 3개월물 (일별)
+    "us_10y2y": "T10Y2Y",       # 10년-2년 스프레드 (일별, FRED 사전계산값)
+    "us_10y3m": "T10Y3M",       # 10년-3개월 스프레드 (일별, FRED 사전계산값)
+    "de_10y": "IRLTLT01DEM156N",  # 독일 10년물 (OECD 장기금리, 월별)
+    "jp_10y": "IRLTLT01JPM156N",  # 일본 10년물 (OECD 장기금리, 월별)
+}
+
+
+def get_fred_series(series_id, api_key, start="2015-01-01"):
+    """FRED(세인트루이스 연준) 시계열 API. 반환: [(date, value), ...] 날짜 오름차순.
+    결측치("." 값)는 제외한다."""
+    params = {"series_id": series_id, "api_key": api_key, "file_type": "json", "observation_start": start}
+    r = requests.get(FRED_API_URL, params=params, timeout=15)
+    r.raise_for_status()
+    data = r.json()
+    if "observations" not in data:
+        raise RuntimeError(f"FRED 응답에 observations가 없습니다 ({series_id}): {data}")
+    obs = data["observations"]
+    return [(o["date"], float(o["value"])) for o in obs if o.get("value") not in (None, ".", "")]
+
+
+def _load_macro_cache():
+    if not os.path.exists(MACRO_CACHE_FILE):
+        return None
+    try:
+        from datetime import datetime
+        with open(MACRO_CACHE_FILE, encoding="utf-8") as f:
+            cache = json.load(f)
+        fetched_at = datetime.fromisoformat(cache["fetched_at"])
+        if (datetime.now() - fetched_at).total_seconds() < MACRO_CACHE_TTL_HOURS * 3600:
+            return cache["data"]
+    except Exception:
+        pass
+    return None
+
+
+def _save_macro_cache(data):
+    from datetime import datetime
+    cache = {"fetched_at": datetime.now().isoformat(), "data": data}
+    try:
+        with open(MACRO_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False)
+    except Exception:
+        pass  # 캐시 저장 실패해도 리포트 생성 자체는 계속 진행
+
+
+def fetch_macro_yield_data(api_key, use_cache=True):
+    """미국(일별)·독일/일본(월별) 장기채 금리를 FRED에서 받아온다. 종목과 무관하게 하루 종일
+    거의 똑같은 값이라, 여러 종목을 연달아 조회해도 매번 새로 받을 필요가 없다 - TTL 캐시로
+    불필요한 API 호출을 줄인다. FRED_API_KEY가 없거나 호출이 실패하면 None을 반환하고,
+    호출부에서 이 섹션 자체를 조용히 생략한다 (다른 선택적 섹션들과 같은 패턴)."""
+    if not api_key:
+        return None
+    if use_cache:
+        cached = _load_macro_cache()
+        if cached is not None:
+            return cached
+    try:
+        data = {}
+        for key, series_id in FRED_SERIES.items():
+            data[key] = get_fred_series(series_id, api_key)
+        _save_macro_cache(data)
+        return data
+    except Exception as e:
+        print(f"  [안내] 매크로(장기채 금리) 데이터 조회 실패, 섹션을 생략합니다: {e}")
+        return None
+
+
+def analyze_yield_curve(spread_series, label):
+    """장단기 금리 스프레드(예: 미국 10Y-2Y) 시계열에서 현재 역전 여부와, 최근(최근 40개
+    관측치=약 2개월 내) '역전 해소'(스프레드가 음수에서 양수로 넘어간 시점) 여부를 판단."""
+    if not spread_series or len(spread_series) < 30:
+        return None
+    dates = [d for d, v in spread_series]
+    vals = [v for d, v in spread_series]
+    cur, cur_date = vals[-1], dates[-1]
+
+    lookback = min(len(vals), 260)  # 최근 약 1년 구간에서 교차 이력을 찾음
+    recent = vals[-lookback:]
+    uninversion_idx = None
+    for i in range(1, len(recent)):
+        if recent[i - 1] < 0 <= recent[i]:
+            uninversion_idx = i
+    days_since_uninversion = (len(recent) - 1) - uninversion_idx if uninversion_idx is not None else None
+    was_inverted_before = uninversion_idx is not None and any(v < 0 for v in recent[:uninversion_idx])
+
+    return {
+        "label": label, "current": cur, "current_date": cur_date, "inverted": cur < 0,
+        "uninversion_recent": bool(was_inverted_before and days_since_uninversion is not None and days_since_uninversion <= 40),
+        "days_since_uninversion": days_since_uninversion,
+        "series": spread_series,
+    }
+
+
+def yield_curve_verdict(curve):
+    """(제목, 색상, 설명) 반환."""
+    if curve is None:
+        return ("데이터 부족", "#898781", "장단기 금리 스프레드 데이터가 부족합니다.")
+    if curve["uninversion_recent"]:
+        d = curve["days_since_uninversion"]
+        return (f"장단기 금리 역전 해소 {d}거래일 전 (위험 신호)", "#d03b3b",
+                f"{curve['label']} 스프레드가 역전(음수) 상태였다가 최근 {d}거래일 전 다시 양수로 돌아섰습니다. "
+                "역전 자체보다 '역전이 풀리는 국면'이 실제 경기침체·주가조정 시점과 더 가깝게 맞물렸던 사례가 "
+                "많습니다(연준이 경기 둔화에 대응해 단기금리를 빠르게 내리면서 역전이 풀리는 경우가 전형적). "
+                "지금 이 구간이라 참고할 만한 위험 신호입니다.")
+    if curve["inverted"]:
+        return (f"장단기 금리 역전 중 ({curve['current']:+.2f}%p)", "#fab219",
+                f"{curve['label']} 스프레드가 현재 {curve['current']:+.2f}%p로 역전(단기금리가 장기금리보다 높음) "
+                "상태입니다. 전통적인 침체 선행지표지만, 역전 자체보다는 이후 '역전이 풀리는 시점'을 더 "
+                "눈여겨볼 만합니다 (선행 시차가 보통 수개월~2년 이상으로 길고 일정하지 않습니다).")
+    return (f"정상(순상향) 상태 ({curve['current']:+.2f}%p)", "#0ca30c",
+            f"{curve['label']} 스프레드가 현재 {curve['current']:+.2f}%p로 정상적인 순상향 곡선입니다. "
+            "장단기 역전에 기반한 경고 신호는 현재 없습니다.")
+
+
+def analyze_long_yield_trend(series, label):
+    """10년물 금리 시계열에서 현재 수준과 최근 1/3/6개월 변화(%p)를 계산.
+    미국은 일별 데이터라 정확한 날짜로, 독일/일본은 월별이라 해당 월 관측치로 근사한다."""
+    if not series or len(series) < 6:
+        return None
+    dates = [d for d, v in series]
+    vals = [v for d, v in series]
+    cur, cur_date = vals[-1], dates[-1]
+
+    from datetime import datetime as _dt
+
+    def value_n_months_ago(n):
+        cur_dt = _dt.strptime(cur_date[:10], "%Y-%m-%d")
+        total_month = cur_dt.year * 12 + (cur_dt.month - 1) - n
+        target_year, target_month = total_month // 12, total_month % 12 + 1
+        prefix = f"{target_year:04d}-{target_month:02d}"
+        same_month = [v for d, v in zip(dates, vals) if d.startswith(prefix)]
+        if same_month:
+            return same_month[0]
+        before = [v for d, v in zip(dates, vals) if d < f"{prefix}-01"]
+        return before[-1] if before else None
+
+    v1, v3, v6 = value_n_months_ago(1), value_n_months_ago(3), value_n_months_ago(6)
+    return {
+        "label": label, "current": cur, "current_date": cur_date, "series": series,
+        "chg_1m": (cur - v1) if v1 is not None else None,
+        "chg_3m": (cur - v3) if v3 is not None else None,
+        "chg_6m": (cur - v6) if v6 is not None else None,
+    }
+
+
+def long_yield_verdict(trend, sharp_bp_3m=50):
+    """3개월 변화폭(bp) 기준 급등/급락/완만 판정 -> (라벨, 색상, 설명)."""
+    if trend is None or trend["chg_3m"] is None:
+        return ("데이터 부족", "#898781", "데이터가 부족해 최근 변화를 계산할 수 없습니다.")
+    bp3 = trend["chg_3m"] * 100
+    if bp3 >= sharp_bp_3m:
+        return (f"급등 (3개월 {bp3:+.0f}bp)", "#d03b3b",
+                f"최근 3개월 새 {bp3:+.0f}bp 올랐습니다. 장기금리가 빠르게 오르면 주식의 요구수익률(할인율)이 "
+                "높아지는 효과가 있어, 특히 고밸류에이션 성장주에 부담이 될 수 있습니다.")
+    if bp3 <= -sharp_bp_3m:
+        return (f"급락 (3개월 {bp3:+.0f}bp)", "#5fbf5f",
+                f"최근 3개월 새 {bp3:+.0f}bp 내렸습니다. 통상 주식에 우호적인 환경이지만, 경기 둔화 우려 때문에 "
+                "금리가 내리는 국면이라면 반드시 좋은 신호는 아닐 수 있습니다.")
+    return (f"완만한 변화 (3개월 {bp3:+.0f}bp)", "#898781", f"최근 3개월 새 {bp3:+.0f}bp로 큰 변화는 없었습니다.")
+
+
+def spread_chart_svg(dates, values, cross_index=None, width=760, height=160):
+    """장단기 스프레드 시계열 - 0선(역전 기준선)을 기준선으로 표시하고, 역전 해소 시점이 있으면
+    표시한다."""
+    n = len(values)
+    if n < 3:
+        return "<p class='muted'>차트를 그리기엔 데이터가 부족합니다.</p>"
+    y_min, y_max = min(values), max(values)
+    pad = (y_max - y_min) * 0.12 or abs(y_max) * 0.1 or 0.2
+    y_min, y_max = min(y_min - pad, -0.1), max(y_max + pad, 0.1)  # 0선이 항상 보이도록
+    SM = {"left": 55, "right": 20, "top": 16, "bottom": 22}
+    plot_w = width - SM["left"] - SM["right"]
+    plot_h = height - SM["top"] - SM["bottom"]
+
+    def lx(i):
+        return SM["left"] + (i / max(n - 1, 1)) * plot_w
+
+    def ly(v):
+        return SM["top"] + plot_h - (v - y_min) / (y_max - y_min) * plot_h
+
+    zero_y = ly(0)
+    pts = " ".join(f"{lx(i):.1f},{ly(v):.1f}" for i, v in enumerate(values))
+    parts = [f'<svg class="linechart" viewBox="0 0 {width} {height}" width="100%" height="{height}">']
+    for frac in (0, 0.5, 1.0):
+        gy = SM["top"] + plot_h * frac
+        parts.append(f'<line x1="{SM["left"]}" y1="{gy:.1f}" x2="{width-SM["right"]}" y2="{gy:.1f}" class="grid"/>')
+    parts.append(f'<line x1="{SM["left"]}" y1="{zero_y:.1f}" x2="{width-SM["right"]}" y2="{zero_y:.1f}" stroke="var(--muted)" stroke-width="1.5"/>')
+    parts.append(f'<text x="{width-SM["right"]}" y="{zero_y-4:.1f}" text-anchor="end" class="avg-label">0%p (역전 기준선)</text>')
+    parts.append(f'<polyline points="{pts}" fill="none" class="series-line"/>')
+    last_color = "#d03b3b" if values[-1] < 0 else "#0ca30c"
+    parts.append(f'<circle cx="{lx(n-1):.1f}" cy="{ly(values[-1]):.1f}" r="4.5" fill="{last_color}" stroke="var(--surface-1)" stroke-width="2"/>')
+    parts.append(f'<text x="{lx(n-1):.1f}" y="{ly(values[-1])-10:.1f}" text-anchor="end" class="cur-label" style="fill:{last_color}">{values[-1]:+.2f}%p</text>')
+    if cross_index is not None and 0 <= cross_index < n:
+        parts.append(f'<circle cx="{lx(cross_index):.1f}" cy="{ly(values[cross_index]):.1f}" r="4.5" fill="#eb6834" stroke="var(--surface-1)" stroke-width="2"/>')
+        parts.append(f'<text x="{lx(cross_index):.1f}" y="{ly(values[cross_index])-10:.1f}" text-anchor="start" class="cur-label" style="fill:#eb6834">역전 해소</text>')
+    parts.append(f'<text x="{SM["left"]}" y="{height-6}" class="axis-label">{dates[0]}</text>')
+    parts.append(f'<text x="{width-SM["right"]}" y="{height-6}" text-anchor="end" class="axis-label">{dates[-1]}</text>')
+    parts.append('</svg>')
+    return "".join(parts)
+
+
+def yield_line_chart_svg(dates, values, width=760, height=130):
+    """단일 금리 시계열 미니 차트 (현재값 라벨 포함)."""
+    n = len(values)
+    if n < 3:
+        return "<p class='muted'>차트를 그리기엔 데이터가 부족합니다.</p>"
+    y_min, y_max = min(values), max(values)
+    pad = (y_max - y_min) * 0.15 or abs(y_max) * 0.1 or 0.2
+    y_min, y_max = y_min - pad, y_max + pad
+    SM = {"left": 46, "right": 20, "top": 14, "bottom": 20}
+    plot_w = width - SM["left"] - SM["right"]
+    plot_h = height - SM["top"] - SM["bottom"]
+
+    def lx(i):
+        return SM["left"] + (i / max(n - 1, 1)) * plot_w
+
+    def ly(v):
+        return SM["top"] + plot_h - (v - y_min) / (y_max - y_min) * plot_h
+
+    pts = " ".join(f"{lx(i):.1f},{ly(v):.1f}" for i, v in enumerate(values))
+    parts = [f'<svg class="linechart" viewBox="0 0 {width} {height}" width="100%" height="{height}">']
+    for frac in (0, 0.5, 1.0):
+        gy = SM["top"] + plot_h * frac
+        parts.append(f'<line x1="{SM["left"]}" y1="{gy:.1f}" x2="{width-SM["right"]}" y2="{gy:.1f}" class="grid"/>')
+    parts.append(f'<polyline points="{pts}" fill="none" class="series-line"/>')
+    parts.append(f'<circle cx="{lx(n-1):.1f}" cy="{ly(values[-1]):.1f}" r="4" class="series-dot"/>')
+    parts.append(f'<text x="{lx(n-1):.1f}" y="{ly(values[-1])-9:.1f}" text-anchor="end" class="cur-label">{values[-1]:.2f}%</text>')
+    parts.append(f'<text x="{SM["left"]}" y="{height-5}" class="axis-label">{dates[0]}</text>')
+    parts.append(f'<text x="{width-SM["right"]}" y="{height-5}" text-anchor="end" class="axis-label">{dates[-1]}</text>')
+    parts.append('</svg>')
+    return "".join(parts)
+
+
+def render_macro_yield_section(macro_data):
+    """macro_data: fetch_macro_yield_data()의 반환값. None이면 섹션 자체를 생략한다
+    (FRED_API_KEY 미설정 또는 조회 실패)."""
+    if not macro_data:
+        return ""
+
+    curve = analyze_yield_curve(macro_data.get("us_10y2y"), "미국 10년-2년")
+    curve_title, curve_color, curve_explain = yield_curve_verdict(curve)
+    curve_chart_html = ""
+    if curve is not None:
+        dates = [d for d, v in curve["series"]]
+        vals = [v for d, v in curve["series"]]
+        cross_idx = None
+        if curve["days_since_uninversion"] is not None:
+            cross_idx = len(vals) - 1 - curve["days_since_uninversion"]
+        curve_chart_html = f"""
+    <div class="tech-subtitle">미국 10년-2년 국채금리 스프레드 추이</div>
+    {spread_chart_svg(dates, vals, cross_idx)}"""
+
+    countries = [
+        ("us_10y", "미국 10년물", "us"),
+        ("de_10y", "독일 10년물(Bund)", "de"),
+        ("jp_10y", "일본 10년물(JGB)", "jp"),
+    ]
+    trend_blocks = []
+    for key, label, tag in countries:
+        series = macro_data.get(key)
+        trend = analyze_long_yield_trend(series, label)
+        t_title, t_color, t_explain = long_yield_verdict(trend)
+        if trend is None:
+            trend_blocks.append(f"""
+    <div class="corr-product">
+      <h3>{label}</h3>
+      <p class="muted">데이터가 부족합니다.</p>
+    </div>""")
+            continue
+        dates = [d for d, v in trend["series"]]
+        vals = [v for d, v in trend["series"]]
+        extra_note = ""
+        if tag == "jp":
+            extra_note = ('<div class="tech-explain">일본은 오랫동안 초저금리(수익률곡선통제·YCC)를 유지하다가 '
+                           '정상화하는 국면이라, JGB 금리 상승은 다른 나라보다 더 큰 의미를 가질 수 있습니다. '
+                           '일본 국채금리가 오르면 저금리로 엔화를 빌려 해외자산에 투자하던 "엔 캐리트레이드"의 '
+                           '매력이 줄어 청산 압력이 커지는데, 이 청산이 급격히 몰리면 글로벌 증시 전반의 '
+                           '변동성을 키울 수 있습니다(2024년 8월이 대표적 사례).</div>')
+        trend_blocks.append(f"""
+    <div class="corr-product">
+      <h3>{label} <span class="corr-badge" style="background:{t_color};">{t_title}</span></h3>
+      <table class="corr-table" style="margin-bottom:8px;">
+        <tr><th>현재</th><th>1개월 전 대비</th><th>3개월 전 대비</th><th>6개월 전 대비</th></tr>
+        <tr><td>{trend['current']:.2f}%</td><td>{fmt_pp_signed(trend['chg_1m'])}</td>
+        <td>{fmt_pp_signed(trend['chg_3m'])}</td><td>{fmt_pp_signed(trend['chg_6m'])}</td></tr>
+      </table>
+      {yield_line_chart_svg(dates, vals)}
+      <div class="tech-explain">{t_explain}</div>
+      {extra_note}
+    </div>""")
+
+    return f"""
+  <div class="card">
+    <h2>매크로 리스크 신호 (미·독·일 장기채 금리)</h2>
+    <div class="muted" style="margin-bottom:14px;">이 신호는 특정 종목이 아니라 시장 전체에 적용되는 거시 지표입니다.
+    미국 국채는 매일, 독일·일본 10년물은 월별(약 1~2개월 시차)로 세인트루이스 연준(FRED) 데이터를 사용합니다.</div>
+    <div class="verdict-row">
+      <span class="corr-badge" style="background:{curve_color}; font-size:14px; padding:6px 14px;">{curve_title}</span>
+    </div>
+    <div class="tech-explain">{curve_explain}</div>
+    {curve_chart_html}
+    <div class="tech-subtitle" style="margin-top:22px;">장기채 금리 수준 &amp; 최근 변화 (미국·독일·일본)</div>
+    {''.join(trend_blocks)}
+    <div class="tech-legend">장기채 금리가 빠르게 오르면 주식(특히 성장주) 밸류에이션에 할인율 상승 압력으로,
+    장단기 금리 역전이 풀리는 국면은 경기침체·조정 시점과 자주 겹쳤던 패턴으로 참고하세요 - 둘 다 확정적
+    신호가 아니라 여러 매크로 지표 중 하나로만 활용하시기 바랍니다.</div>
+  </div>"""
+
+
 # --------------------------------------------------------------------- 외국인·프로그램매매 수급
 # 당일 스냅샷(외국인 보유율/순매수, 프로그램매매 순매수)은 현재가 조회(quote) 응답에 이미 들어있는
 # 필드라 항상 신뢰할 수 있다. 최근 며칠간의 추이는 별도 엔드포인트(get_investor_trend)를 추가로
@@ -1373,6 +1760,142 @@ def render_investor_flow_section(quote, investor_trend_body=None):
   </div>"""
 
 
+# --------------------------------------------------------------------- 거래량 급등일 투자자별 수급
+# "거래량이 급등한 날, 개인/외국인/기관 중 누가 많이 샀는가"를 보여준다. 급등일 탐지 로직은
+# event_backtest.py의 find_spike_events()와 동일(하루 등락률 5%+ & 거래량 20일평균 대비 1.5배+)하되,
+# 여기서는 별도 파일 없이 이미 리포트에서 받아온 daily_bars로 즉석에서 계산한다.
+# 투자자별 순매수(개인/외국인/기관)는 get_investor_trend(FHKST01010900)에서 받는데, 이 엔드포인트는
+# (1) 스키마 자체가 실전검증이 부족하고 (2) 날짜 범위를 지정할 수 없어 보통 최근 구간만 돌려주는
+# 것으로 보인다. 그래서 daily_bars에서 찾은 급등일 중 investor_trend가 실제로 커버하는 날짜만
+# 매칭해서 보여주고, 그 범위 밖은 조용히 제외한다(개수만 안내) - 값을 지어내지 않는다.
+
+def parse_investor_trend_by_date(investor_trend_body):
+    """get_investor_trend() 응답을 {날짜: {"individual","foreign","institution"}} 형태로 정리.
+    필드명(prsn_ntby_qty/frgn_ntby_qty/orgn_ntby_qty)은 KIS의 통상적인 개인/외국인/기관 네이밍
+    관례를 따른 추정치라 실전검증이 덜 됐다 - 필드가 없거나 이름이 다르면 그 항목만 None이 된다."""
+    if not investor_trend_body:
+        return {}
+
+    def to_float(v):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    out = {}
+    for r in investor_trend_body.get("output", []) or []:
+        d = r.get("stck_bsop_date")
+        if not d:
+            continue
+        out[d] = {
+            "individual": to_float(r.get("prsn_ntby_qty")),
+            "foreign": to_float(r.get("frgn_ntby_qty")),
+            "institution": to_float(r.get("orgn_ntby_qty")),
+        }
+    return out
+
+
+def find_spike_events(daily_bars, min_abs_return=0.05, min_vol_ratio=1.5, vol_window=20):
+    """일별 등락률이 min_abs_return 이상이고, 거래량이 직전 vol_window일 평균 대비 min_vol_ratio배
+    이상인 날을 '이벤트'로 판정 (event_backtest.py의 동명 함수와 동일한 로직).
+    반환: [{"index","date","ret","direction","vol_ratio"}, ...] 날짜 오름차순."""
+    closes = [b["close"] for b in daily_bars]
+    volumes = [b["volume"] for b in daily_bars]
+    dates = [b["date"] for b in daily_bars]
+    events = []
+    for i in range(vol_window, len(closes)):
+        if closes[i - 1] == 0:
+            continue
+        ret = (closes[i] - closes[i - 1]) / closes[i - 1]
+        avg_vol = sum(volumes[i - vol_window:i]) / vol_window
+        if avg_vol <= 0:
+            continue
+        vol_ratio = volumes[i] / avg_vol
+        if abs(ret) >= min_abs_return and vol_ratio >= min_vol_ratio:
+            events.append({"index": i, "date": dates[i], "ret": ret,
+                            "direction": "up" if ret > 0 else "down", "vol_ratio": vol_ratio})
+    return events
+
+
+def whobought_label(individual, foreign, institution):
+    """개인/외국인/기관 순매수량 중 (양수인 것들 중) 가장 많이 순매수한 주체 -> (라벨, 색상).
+    셋 다 순매도(또는 데이터 없음)면 None."""
+    candidates = {"개인": individual, "외국인": foreign, "기관": institution}
+    positive = {k: v for k, v in candidates.items() if v is not None and v > 0}
+    if not positive:
+        return None, None
+    winner = max(positive, key=positive.get)
+    color = {"개인": "#eb6834", "외국인": "#2a78d6", "기관": "#0ca30c"}[winner]
+    return winner, color
+
+
+def render_spike_investor_flow_section(daily_bars, investor_trend_body):
+    """daily_bars로 거래량 급등일을 찾고, investor_trend_body가 커버하는 날짜와 매칭되는 것만
+    개인/외국인/기관 순매수 breakdown을 보여준다. 매칭되는 게 하나도 없으면 섹션 자체를 생략한다."""
+    if not daily_bars or len(daily_bars) < 25:
+        return ""
+    trend_by_date = parse_investor_trend_by_date(investor_trend_body)
+    if not trend_by_date:
+        return ""
+
+    events = find_spike_events(daily_bars)
+    if not events:
+        return ""
+
+    matched, unmatched_count = [], 0
+    for e in reversed(events):  # 최신 이벤트부터
+        d = e["date"]
+        flow = trend_by_date.get(d)
+        if flow is None or all(v is None for v in flow.values()):
+            unmatched_count += 1
+            continue
+        matched.append((e, flow))
+        if len(matched) >= 10:
+            break
+
+    if not matched:
+        return ""
+
+    def fmt_qty(v):
+        if v is None:
+            return "N/A"
+        sign = "+" if v >= 0 else ""
+        return f"{sign}{v:,.0f}주"
+
+    rows = []
+    for e, flow in matched:
+        winner, wcolor = whobought_label(flow["individual"], flow["foreign"], flow["institution"])
+        winner_badge = (f'<span class="corr-badge" style="background:{wcolor};">{winner} 순매수 우위</span>'
+                         if winner else '<span class="corr-badge" style="background:#898781;">3주체 모두 순매도</span>')
+        dir_color = "#d03b3b" if e["direction"] == "up" else "#2a78d6"
+        rows.append(
+            f"<tr><td>{e['date']}</td>"
+            f"<td style='color:{dir_color};'>{e['ret']*100:+.1f}%</td>"
+            f"<td>{e['vol_ratio']:.1f}배</td>"
+            f"<td>{fmt_qty(flow['individual'])}</td>"
+            f"<td>{fmt_qty(flow['foreign'])}</td>"
+            f"<td>{fmt_qty(flow['institution'])}</td>"
+            f"<td>{winner_badge}</td></tr>"
+        )
+
+    coverage_note = ""
+    if unmatched_count:
+        coverage_note = (f' 이번 조회에서 investor_trend가 커버하는 날짜 범위 밖이라 제외된 급등일이 '
+                          f'{unmatched_count}건 더 있습니다(더 오래된 급등일일수록 데이터가 없을 가능성이 높습니다).')
+
+    return f"""
+  <div class="card">
+    <h2>거래량 급등일 투자자별 수급</h2>
+    <div class="muted" style="margin-bottom:14px;">하루 등락률 5%+ &amp; 거래량이 20일 평균 대비 1.5배+ 인
+    날(=거래량 급등일)에 개인/외국인/기관 중 누가 순매수를 주도했는지 보여줍니다. 개인/외국인/기관 구분은
+    실전검증이 충분치 않은 KIS 엔드포인트(FHKST01010900)에 의존하고 있어 참고용으로만 활용하세요.{coverage_note}</div>
+    <table class="corr-table">
+      <tr><th>날짜</th><th>당일수익률</th><th>거래량</th><th>개인</th><th>외국인</th><th>기관</th><th>순매수 우위</th></tr>
+      {''.join(rows)}
+    </table>
+  </div>"""
+
+
 # --------------------------------------------------------------------- 애널리스트 목표주가 (수동 입력)
 # analyst_targets.json (같은 폴더)에 사용자가 증권사 리포트를 보고 직접 입력해두는 데이터.
 # KIS API로 자동 조회되는 값이 아니다 - 새 리포트가 나오면 이 파일을 직접 갱신해야 반영된다.
@@ -1458,6 +1981,7 @@ def render_export_corr_section(code, bars):
     if not products:
         return ""
 
+    metric_key_map = {"수출액": "expDlr", "물량": "expWgt", "단가": "unit_price"}
     blocks = []
     for label_kr, label in products:
         cdict = load_customs_local(label)
@@ -1470,13 +1994,6 @@ def render_export_corr_section(code, bars):
             print(f"  [안내] '{label_kr}' 데이터와 주가의 공통 구간이 너무 짧아 상관관계를 계산하지 못했습니다.")
             continue
 
-        rows_html = []
-        for metric in ["수출액", "물량", "단가"]:
-            m = corr[metric]
-            rows_html.append(
-                f"<tr><td>{metric}</td><td>{fmt_r(m['전체기간'])}</td>"
-                f"<td>{fmt_r(m['2024-01~'])}</td><td>{fmt_r(m['2025-01~'])}</td></tr>"
-            )
         # 헤드라인: 2025~ 구간에서 절대값이 가장 큰 지표를 대표로 표시
         best_metric, best_r = None, None
         for metric in ["수출액", "물량", "단가"]:
@@ -1485,14 +2002,38 @@ def render_export_corr_section(code, bars):
                 best_metric, best_r = metric, r
         vtext, vcolor = corr_verdict(best_r)
 
+        # 표 대신 차트로: 대표 지표(주가 vs 수출액/물량/단가 중 하나)를 각각 첫 시점=100으로
+        # 지수화해서 겹쳐 그린다 - r 계수 하나만 보는 것보다 두 선이 실제로 같이 움직이는지
+        # 눈으로 바로 확인할 수 있다.
+        chart_metric = best_metric or "수출액"
+        metric_key = metric_key_map[chart_metric]
+        chart_dates, chart_prices, chart_metric_vals = [], [], []
+        for ym in corr["common_yms"]:
+            mv = cdict[ym].get(metric_key)
+            if mv is None:
+                continue
+            chart_dates.append(ym)
+            chart_prices.append(corr["price_by_ym"][ym])
+            chart_metric_vals.append(mv)
+        chart_html = export_index_chart_svg(chart_dates, chart_prices, chart_metric_vals)
+
+        # r 계수는 표 대신 지표별 요약 배지로 간략히 표시 (전체기간/2024~/2025~)
+        r_badges = " &nbsp;·&nbsp; ".join(
+            f"{metric}: 전체 {fmt_r(corr[metric]['전체기간'])} / 2024~ {fmt_r(corr[metric]['2024-01~'])} / "
+            f"2025~ {fmt_r(corr[metric]['2025-01~'])}"
+            for metric in ["수출액", "물량", "단가"]
+        )
+
         blocks.append(f"""
     <div class="corr-product">
       <h3>{label_kr} <span class="corr-badge" style="background:{vcolor}">{vtext}</span></h3>
-      <div class="corr-range">공통 구간 {corr['n']}개월 ({corr['range'][0]} ~ {corr['range'][1]}) · 대표 지표: {best_metric or '-'} (r={fmt_r(best_r)})</div>
-      <table class="corr-table">
-        <tr><th>지표</th><th>전체기간</th><th>2024~</th><th>2025~</th></tr>
-        {''.join(rows_html)}
-      </table>
+      <div class="corr-range">공통 구간 {corr['n']}개월 ({corr['range'][0]} ~ {corr['range'][1]}) · 대표 지표: {chart_metric} (r={fmt_r(best_r)})</div>
+      <div class="chart-legend">
+        <span><span class="dot" style="background:var(--series-1)"></span>주가(지수화)</span>
+        <span><span class="dot" style="background:var(--series-2)"></span>{chart_metric}(지수화)</span>
+      </div>
+      {chart_html}
+      <div class="corr-range" style="margin-top:8px;">{r_badges}</div>
     </div>""")
 
     if not blocks:
@@ -1501,9 +2042,11 @@ def render_export_corr_section(code, bars):
     return f"""
   <div class="card">
     <h2>수출입데이터 상관관계 (관세청 품목별 수출입실적)</h2>
-    <div class="muted" style="margin-bottom:14px;">상관계수(r)는 주가와 각 지표 간 Pearson 상관계수. |r|≥0.5 의미있는 신호,
-    0.3~0.5 약한 신호, 그 미만 무의미로 표시합니다. DRAM/NAND처럼 소수 기업이 수출을 사실상 독점하는
-    품목은 신호가 강하고, MLCC/카메라모듈처럼 여러 회사가 섞인 품목은 신호가 약할 수 있습니다.</div>
+    <div class="muted" style="margin-bottom:14px;">차트는 주가와 수출 지표를 각각 시작월=100 기준으로
+    지수화해서 겹쳐 그린 것으로, 두 선이 같이 움직이는지를 눈으로 볼 수 있습니다. 아래 r 값은 주가와
+    각 지표 간 Pearson 상관계수로, |r|≥0.5 의미있는 신호, 0.3~0.5 약한 신호, 그 미만 무의미로
+    판단합니다. DRAM/NAND처럼 소수 기업이 수출을 사실상 독점하는 품목은 신호가 강하고, MLCC/카메라모듈처럼
+    여러 회사가 섞인 품목은 신호가 약할 수 있습니다.</div>
     {''.join(blocks)}
   </div>"""
 
@@ -1734,7 +2277,7 @@ def render_event_backtest_section(code, daily_bars):
   </div>"""
 
 
-def build_report(code, name, quote, annual, bars, daily_bars=None, investor_trend=None):
+def build_report(code, name, quote, annual, bars, daily_bars=None, investor_trend=None, macro_data=None):
     history = build_history(annual, bars)
     n_months = len(history)
     if n_months < 6:
@@ -1767,6 +2310,8 @@ def build_report(code, name, quote, annual, bars, daily_bars=None, investor_tren
     event_backtest_section = render_event_backtest_section(code, daily_bars)
     per_price_corr_section = render_per_price_correlation_section(history)
     investor_flow_section = render_investor_flow_section(quote, investor_trend)
+    spike_investor_section = render_spike_investor_flow_section(daily_bars, investor_trend)
+    macro_section = render_macro_yield_section(macro_data)
 
     from datetime import datetime
     snapshot_date = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -1781,6 +2326,7 @@ def build_report(code, name, quote, annual, bars, daily_bars=None, investor_tren
         export_corr_section=export_corr_section, technical_section=technical_section,
         analyst_section=analyst_section, event_backtest_section=event_backtest_section,
         per_price_corr_section=per_price_corr_section, investor_flow_section=investor_flow_section,
+        macro_section=macro_section, spike_investor_section=spike_investor_section,
     )
     return html, verdict, composite_pct
 
@@ -1831,7 +2377,19 @@ def main():
     except Exception:
         investor_trend = None
 
-    html, verdict, composite_pct = build_report(code, name, quote["output"], annual, bars, daily_bars, investor_trend)
+    fred_api_key = os.environ.get("FRED_API_KEY")
+    if fred_api_key:
+        try:
+            macro_data = fetch_macro_yield_data(fred_api_key)
+        except Exception as e:
+            print(f"  [안내] 매크로(장기채 금리) 데이터 조회 실패, 섹션을 생략합니다: {e}")
+            macro_data = None
+    else:
+        print("  [안내] FRED_API_KEY가 설정되지 않아 '매크로 리스크 신호' 섹션은 생략합니다 "
+              "(선택 사항 - README 참고).")
+        macro_data = None
+
+    html, verdict, composite_pct = build_report(code, name, quote["output"], annual, bars, daily_bars, investor_trend, macro_data)
 
     out_filename = f"개미는뚠뚠_리포트_{code}.html"
     with open(out_filename, "w", encoding="utf-8") as f:
