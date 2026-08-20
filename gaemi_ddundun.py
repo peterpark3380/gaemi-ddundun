@@ -1253,6 +1253,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   {technical_section}
 
+  {rebound_check_section}
+
   {event_backtest_section}
 
   {export_corr_section}
@@ -1292,6 +1294,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <li>"외국인·프로그램매매 수급"의 당일 수치는 KIS 실시간 스냅샷이라 신뢰할 수 있지만, 최근
         추이 조회는 상대적으로 검증이 덜 된 API라 조회에 실패하면 그 부분만 조용히 생략될 수
         있습니다.</li>
+      <li>"반등 신뢰도 체크"는 고점 대비 15% 이상 하락한 뒤 저점 대비 5% 이상 반등한 구간이 있을
+        때만 표시됩니다. 거래량 동반/이동평균 재탈환/투매 흔적/다이버전스 4개 지표는 근거가 있는
+        편이라 점수에 반영하지만, 피보나치 되돌림은 실제 백테스트(나스닥100+S&amp;P500 102개 종목
+        검증)에서 성공률 37%로 무작위보다도 낮게 나온 사례가 있어 점수에서 제외하고 참고용으로만
+        보여줍니다. 4개 지표가 모두 확인돼도 확정적 반전 신호가 아니라, 여전히 손절 기준을 정해두고
+        접근해야 하는 참고 지표입니다.</li>
     </ul>
   </div>
 
@@ -2200,6 +2208,309 @@ def render_technical_signal_section(daily_bars):
   </div>"""
 
 
+# --------------------------------------------------------------------- 반등 신뢰도 체크 (하락 후 반등 - 가짜/진짜 판별)
+# "하락 후 반등 구간에서 가짜 반등(데드캣바운스)인지 진짜 반등인지 구별하는 지표가 있을까, 진짜라면
+# 공통적으로 어떤 현상이 있는지, 피보나치 되돌림은 얼마나 잘 맞는지"라는 질문에서 시작된 기능.
+# 리서치 결과를 반영: 거래량 동반/이동평균 재탈환/투매 확인/다이버전스는 실무적으로 근거가 있는
+# 편이고(다만 다이버전스는 단독으로는 근거가 약해 거래량 동반시에만 유효로 카운트), 피보나치
+# 되돌림은 오히려 백테스트 근거가 약함(나스닥100+S&P500 102개 종목 검증에서 성공률 37%로 무작위보다
+# 낮음) - 그래서 4개 지표만 점수화하고 피보나치는 참고용으로 분리해서 보여준다.
+
+def find_decline_bounce_setup(closes, min_decline_pct=0.15, min_bounce_pct=0.05,
+                               low_lookback=90, high_lookback=250):
+    """최근 구간에서 '뚜렷한 하락 후 반등중'인 구간을 찾는다 (없으면 섹션 자체를 생략하기 위함).
+    1) 최근 low_lookback거래일 내 최저 종가 = 저점 후보
+    2) 그 저점 이전 high_lookback거래일 내 최고 종가 = 저점까지 하락해온 출발점(고점)
+    3) 고점->저점 하락폭이 min_decline_pct 이상이고, 저점->현재 반등폭이 min_bounce_pct 이상이어야 대상.
+    반환: {"high_idx","high_val","low_idx","low_val","decline_pct","bounce_pct"} 또는 None."""
+    n = len(closes)
+    if n < 30:
+        return None
+    search_start = max(0, n - low_lookback)
+    window = closes[search_start:]
+    low_val = min(window)
+    low_idx = search_start + window.index(low_val)
+
+    # 저점이 아직 반등으로 '확인'되지 않은 최근 며칠(맨 끝)이면 비교할 반등 구간 자체가 없음
+    if low_idx >= n - 3:
+        return None
+
+    high_search_start = max(0, low_idx - high_lookback)
+    high_window = closes[high_search_start:low_idx + 1]
+    high_val = max(high_window)
+    high_idx = high_search_start + high_window.index(high_val)
+    if high_idx >= low_idx:
+        return None
+
+    decline_pct = (low_val - high_val) / high_val
+    cur_price = closes[-1]
+    bounce_pct = (cur_price - low_val) / low_val
+
+    if decline_pct > -min_decline_pct or bounce_pct < min_bounce_pct:
+        return None
+
+    return {"high_idx": high_idx, "high_val": high_val, "low_idx": low_idx, "low_val": low_val,
+            "decline_pct": decline_pct, "bounce_pct": bounce_pct}
+
+
+def fibonacci_levels(high_val, low_val):
+    """하락구간(고점→저점)에 대한 표준 피보나치 되돌림 레벨. 반환: [(ratio, price), ...] 비율 오름차순."""
+    diff = high_val - low_val
+    ratios = [0.236, 0.382, 0.5, 0.618, 0.786]
+    return [(r, low_val + diff * r) for r in ratios]
+
+
+def find_capitulation_day(closes, volumes, search_start, search_end, vol_window=20,
+                           min_vol_ratio=2.5, min_decline=0.04):
+    """search_start~search_end 구간에서 거래량 급증(직전 vol_window일 평균 대비, find_spike_events와
+    동일한 계산 방식)을 동반한 큰 하락일(투매/셀링클라이맥스 흔적)을 찾는다.
+    반환: {"index","ret","vol_ratio"} (구간 내 가장 강한 후보) 또는 None(못 찾음)."""
+    best = None
+    start = max(search_start, vol_window)
+    for i in range(start, search_end + 1):
+        if closes[i - 1] == 0:
+            continue
+        ret = (closes[i] - closes[i - 1]) / closes[i - 1]
+        avg_vol = sum(volumes[i - vol_window:i]) / vol_window
+        if avg_vol <= 0:
+            continue
+        vol_ratio = volumes[i] / avg_vol
+        if ret <= -min_decline and vol_ratio >= min_vol_ratio:
+            if best is None or vol_ratio > best["vol_ratio"]:
+                best = {"index": i, "ret": ret, "vol_ratio": vol_ratio}
+    return best
+
+
+def rebound_chart_svg(dates, closes, high_idx, low_idx, fib_levels, width=760, height=240):
+    """고점 시점부터 현재까지 종가 추이 + 피보나치 되돌림 레벨(수평 점선)을 함께 그린다."""
+    start = high_idx
+    seg_dates = dates[start:]
+    seg_closes = closes[start:]
+    m = len(seg_closes)
+    if m < 3:
+        return "<p class='muted'>차트를 그리기엔 데이터가 부족합니다.</p>"
+
+    level_vals = [p for _, p in fib_levels]
+    y_min = min(seg_closes + level_vals)
+    y_max = max(seg_closes + level_vals)
+    pad = (y_max - y_min) * 0.08 or abs(y_max) * 0.08 or 1
+    y_min, y_max = y_min - pad, y_max + pad
+    SM = {"left": 60, "right": 46, "top": 16, "bottom": 22}
+    plot_w = width - SM["left"] - SM["right"]
+    plot_h = height - SM["top"] - SM["bottom"]
+
+    def lx(i):
+        return SM["left"] + (i / max(m - 1, 1)) * plot_w
+
+    def ly(v):
+        return SM["top"] + plot_h - (v - y_min) / (y_max - y_min) * plot_h
+
+    parts = [f'<svg class="linechart" viewBox="0 0 {width} {height}" width="100%" height="{height}">']
+    for ratio, price in fib_levels:
+        gy = ly(price)
+        parts.append(f'<line x1="{SM["left"]}" y1="{gy:.1f}" x2="{width-SM["right"]}" y2="{gy:.1f}" '
+                      f'stroke="var(--muted)" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>')
+        parts.append(f'<text x="{width-SM["right"]+4}" y="{gy+3:.1f}" class="axis-label">{ratio*100:.1f}%</text>')
+
+    pts = " ".join(f"{lx(i):.1f},{ly(v):.1f}" for i, v in enumerate(seg_closes))
+    parts.append(f'<polyline points="{pts}" fill="none" class="series-line"/>')
+
+    low_i_rel = low_idx - start
+    for i_rel, color, label in [(0, "#d03b3b", "고점"), (low_i_rel, "#0ca30c", "저점")]:
+        if 0 <= i_rel < m:
+            cx, cy = lx(i_rel), ly(seg_closes[i_rel])
+            parts.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="5" fill="{color}" stroke="var(--surface-1)" stroke-width="2"/>')
+            parts.append(f'<text x="{cx:.1f}" y="{cy-10:.1f}" text-anchor="middle" class="cur-label" style="fill:{color}">{label}</text>')
+
+    cx, cy = lx(m - 1), ly(seg_closes[-1])
+    parts.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="5" fill="var(--series-1)" stroke="var(--surface-1)" stroke-width="2"/>')
+    parts.append(f'<text x="{SM["left"]}" y="{height-6}" class="axis-label">{seg_dates[0]}</text>')
+    parts.append(f'<text x="{width-SM["right"]}" y="{height-6}" text-anchor="end" class="axis-label">{seg_dates[-1]}</text>')
+    parts.append('</svg>')
+    return "".join(parts)
+
+
+def render_rebound_check_section(daily_bars):
+    """daily_bars: get_daily_bars_chunked() 반환값. 뚜렷한 '하락 후 반등' 구간이 감지될 때만
+    카드를 표시하고, 그렇지 않으면 빈 문자열(섹션 생략) - 항상 떠 있으면 해당 없는 종목에서도
+    억지로 판단을 내리는 것처럼 보여서, 실제로 그 국면일 때만 노출한다."""
+    MIN_BARS = 60
+    if not daily_bars or len(daily_bars) < MIN_BARS:
+        return ""
+
+    dates = [b["date"] for b in daily_bars]
+    closes = [b["close"] for b in daily_bars]
+    volumes = [b["volume"] for b in daily_bars]
+
+    setup = find_decline_bounce_setup(closes)
+    if setup is None:
+        return ""
+
+    high_idx, high_val = setup["high_idx"], setup["high_val"]
+    low_idx, low_val = setup["low_idx"], setup["low_val"]
+    decline_pct, bounce_pct = setup["decline_pct"], setup["bounce_pct"]
+    cur_price = closes[-1]
+    n = len(closes)
+
+    # ---- 1) 거래량 동반 반등 (가짜 반등을 가르는 가장 근거 있는 기준 - 반등이 하락 때보다
+    # 더 큰 거래량을 동반해야 새로운 매수세로 볼 수 있다) ----
+    decline_vols = volumes[high_idx:low_idx + 1]
+    bounce_vols = volumes[low_idx:]
+    avg_vol_decline = sum(decline_vols) / len(decline_vols) if decline_vols else 0
+    avg_vol_bounce = sum(bounce_vols) / len(bounce_vols) if bounce_vols else 0
+    vol_ratio = (avg_vol_bounce / avg_vol_decline) if avg_vol_decline > 0 else None
+    ma20 = moving_average(closes, 20)
+    vol_confirmed = (vol_ratio is not None and vol_ratio >= 1.3
+                      and ma20 is not None and cur_price >= ma20)
+    if vol_ratio is None:
+        vol_label, vol_color = "데이터 부족", "#898781"
+        vol_explain = "거래량 데이터가 부족해 판단할 수 없습니다."
+    elif vol_confirmed:
+        vol_label, vol_color = "거래량 동반 확인", "#0ca30c"
+        vol_explain = (f"반등 구간 평균거래량이 하락 구간의 {vol_ratio:.1f}배이고, 20일선({ma20:,.0f}원)도 "
+                        f"회복했습니다. 새로운 매수세가 유입되고 있다는 신호입니다.")
+    elif vol_ratio < 1.0:
+        vol_label, vol_color = "거래량 빈약 (경고)", "#d03b3b"
+        vol_explain = (f"반등 구간 평균거래량이 하락 구간의 {vol_ratio:.1f}배로 오히려 더 적습니다. "
+                        "숏커버링·저가매수 정도의 힘만 실린 가짜 반등(데드캣바운스)일 위험이 있습니다.")
+    else:
+        vol_label, vol_color = "거래량 부분적 (약함)", "#fab219"
+        vol_explain = (f"반등 구간 평균거래량이 하락 구간의 {vol_ratio:.1f}배로 늘긴 했지만, 기준(1.3배 이상 "
+                        f"+ 20일선 회복)은 아직 다 채우지 못했습니다.")
+
+    # ---- 2) 50일 이동평균 재탈환 + 기울기 전환 ----
+    ma50_series = moving_average_series(closes, 50)
+    last3_above = (n >= 3 and all(ma50_series[i] is not None and closes[i] > ma50_series[i]
+                                   for i in range(n - 3, n)))
+    slope_up = (n > 10 and ma50_series[-1] is not None and ma50_series[-11] is not None
+                and ma50_series[-1] > ma50_series[-11])
+    ma_reclaim = last3_above and slope_up
+    cur_ma50 = ma50_series[-1]
+    if cur_ma50 is None:
+        ma_label, ma_color = "데이터 부족", "#898781"
+        ma_explain = "50일 이동평균을 계산하기엔 데이터가 부족합니다."
+    elif ma_reclaim:
+        ma_label, ma_color = "50일선 재탈환 + 상승전환", "#0ca30c"
+        ma_explain = f"최근 3거래일 연속 50일선({cur_ma50:,.0f}원) 위에서 마감했고, 50일선 자체도 상승 전환했습니다."
+    elif last3_above:
+        ma_label, ma_color = "50일선 위 (기울기 아직)", "#fab219"
+        ma_explain = f"종가는 50일선({cur_ma50:,.0f}원) 위지만, 50일선 기울기는 아직 위로 꺾이지 않았습니다."
+    else:
+        ma_label, ma_color = "50일선 아래", "#d03b3b"
+        ma_explain = f"아직 50일선({cur_ma50:,.0f}원)을 완전히 회복하지 못했습니다."
+
+    # ---- 3) 투매(캐피출레이션) 흔적 ----
+    cap_search_start = max(0, high_idx)
+    cap_search_end = min(low_idx + 2, n - 1)
+    cap = find_capitulation_day(closes, volumes, cap_search_start, cap_search_end)
+    cap_found = cap is not None
+    if cap_found:
+        cap_date = dates[cap["index"]]
+        cap_label, cap_color = "투매 거래량 확인", "#0ca30c"
+        cap_explain = (f"{cap_date[:4]}-{cap_date[4:6]}-{cap_date[6:8]}에 평균 대비 거래량 "
+                        f"{cap['vol_ratio']:.1f}배, {cap['ret']*100:.1f}% 급락이 있었습니다. 매도 물량이 "
+                        "짧은 시간에 소진됐을 가능성을 시사하는 전형적인 셀링 클라이맥스 패턴입니다.")
+    else:
+        cap_label, cap_color = "투매 흔적 없음", "#898781"
+        cap_explain = "하락 구간에서 거래량이 급증한 항복성 매도(투매)일이 뚜렷하게 확인되지 않았습니다."
+
+    # ---- 4) OBV/RSI 다이버전스 (거래량 동반 반등일 때만 유효로 카운트 - 다이버전스 단독은
+    # 과매도 구간에서 자연스럽게 나타날 수 있어 근거가 약하다는 리서치 결과 반영) ----
+    obv = compute_obv(closes, volumes)
+    rsi = compute_rsi(closes, period=14)
+    div_result = detect_divergence(dates, closes, obv, rsi, order=5)
+    div_title, div_color_raw, div_explain_raw = divergence_verdict(div_result)
+    div_signal_raw = (div_result["type"] == "bullish"
+                       and sum(1 for s in div_result["signals"].values() if s) >= 1)
+    div_confirmed = div_signal_raw and vol_confirmed
+    if div_signal_raw and not vol_confirmed:
+        div_label, div_color = div_title + " (거래량 미동반 - 약함)", "#fab219"
+        div_explain = div_explain_raw + " 다만 거래량 확인 조건을 아직 충족하지 못해 신뢰도를 낮춰서 봅니다."
+    elif div_confirmed:
+        div_label, div_color = div_title + " + 거래량 동반", "#0ca30c"
+        div_explain = div_explain_raw
+    elif div_result["type"] == "bearish":
+        div_label, div_color = div_title, div_color_raw
+        div_explain = div_explain_raw + (" (참고: 이번 하락→반등 구간이 아니라 그와 별개인 최근 고점 "
+                                          "스윙을 비교한 결과라, 이 반등 자체를 부정하는 신호는 아닙니다.)")
+    else:
+        div_label, div_color = div_title, div_color_raw
+        div_explain = div_explain_raw
+
+    checklist = [
+        ("거래량 동반 반등", vol_label, vol_color, vol_explain, vol_confirmed),
+        ("50일 이동평균 재탈환+기울기전환", ma_label, ma_color, ma_explain, ma_reclaim),
+        ("투매(캐피출레이션) 흔적", cap_label, cap_color, cap_explain, cap_found),
+        ("OBV/RSI 다이버전스 (거래량 동반시만 유효)", div_label, div_color, div_explain, div_confirmed),
+    ]
+    n_confirmed = sum(1 for _, _, _, _, b in checklist if b)
+    if n_confirmed >= 3:
+        summary_color, summary_label = "#0ca30c", "진짜 반등에 가까운 신호"
+    elif n_confirmed == 2:
+        summary_color, summary_label = "#fab219", "신호 혼재 - 좀 더 확인 필요"
+    else:
+        summary_color, summary_label = "#d03b3b", "가짜 반등(데드캣바운스) 경계 필요"
+
+    checklist_rows = "".join(
+        f"""<tr><td>{name}</td><td><span class="corr-badge" style="background:{c}">{label}</span></td>
+        <td style="font-size:12px; color:var(--text-secondary);">{exp}</td></tr>"""
+        for name, label, c, exp, _ in checklist
+    )
+
+    # ---- 피보나치 되돌림 (참고용 - 위 4개 점수에는 포함하지 않음) ----
+    fib_levels = fibonacci_levels(high_val, low_val)
+    retrace_pct = (cur_price - low_val) / (high_val - low_val) * 100 if high_val != low_val else None
+    ma60 = moving_average(closes, 60)
+    ma_vals = {"20일선": ma20, "50일선": cur_ma50, "60일선": ma60}
+    fib_rows = []
+    for ratio, price in fib_levels:
+        confluence = [label for label, mv in ma_vals.items()
+                      if mv is not None and price != 0 and abs(price - mv) / price <= 0.015]
+        confluence_str = ", ".join(confluence) if confluence else "-"
+        reached = "돌파" if cur_price >= price else "-"
+        fib_rows.append(
+            f"<tr><td>{ratio*100:.1f}%</td><td>{price:,.0f}원</td><td>{reached}</td><td>{confluence_str}</td></tr>"
+        )
+    fib_table = "".join(fib_rows)
+
+    chart_html = rebound_chart_svg(dates, closes, high_idx, low_idx, fib_levels)
+
+    def fmt_date(d):
+        return f"{d[:4]}-{d[4:6]}-{d[6:8]}"
+
+    return f"""
+  <div class="card">
+    <h2>반등 신뢰도 체크 (가짜 반등 vs 진짜 반등)</h2>
+    <div class="tech-explain">고점 {fmt_date(dates[high_idx])}({high_val:,.0f}원) → 저점 {fmt_date(dates[low_idx])}
+    ({low_val:,.0f}원, 고점 대비 {decline_pct*100:.1f}%) → 현재 {cur_price:,.0f}원 (저점 대비 +{bounce_pct*100:.1f}%)
+    구간이 감지되어 반등 신뢰도를 체크합니다.</div>
+    <div class="verdict-row">
+      <span class="corr-badge" style="background:{summary_color}; font-size:14px; padding:6px 14px;">
+        {summary_label} (4개 중 {n_confirmed}개 확인)</span>
+    </div>
+    <table class="corr-table">
+      <tr><th>지표</th><th>현재 상태</th><th>설명</th></tr>
+      {checklist_rows}
+    </table>
+    <div class="chart-legend">
+      <span><span class="dot" style="background:var(--series-1)"></span>종가</span>
+      <span style="color:var(--muted);">점선 = 피보나치 되돌림 레벨</span>
+    </div>
+    {chart_html}
+
+    <div class="tech-subtitle" style="margin-top:18px;">피보나치 되돌림 (참고용 - 위 점수에는 포함하지 않음)</div>
+    <table class="corr-table">
+      <tr><th>되돌림 비율</th><th>가격</th><th>현재가 대비</th><th>구조적 레벨과 합류</th></tr>
+      {fib_table}
+    </table>
+    <div class="tech-explain">현재 되돌림률 {f"{retrace_pct:.0f}%" if retrace_pct is not None else "N/A"}.
+    피보나치는 실제 검증(나스닥100+S&amp;P500 102개 종목 백테스트)에서 성공률 37%로 오히려 무작위보다
+    낮게 나온 사례가 있어, 단독 지지/저항 신호로는 신뢰도가 낮습니다. 다른 이동평균선과 겹치는
+    "합류" 레벨일 때만 참고하세요.</div>
+    <div class="tech-legend">일봉 {len(daily_bars)}개 ({dates[0]} ~ {dates[-1]}) 기준 · 이 신호는 위 밸류에이션·다른 기술적 신호와 별개입니다.</div>
+  </div>"""
+
+
 # --------------------------------------------------------------------- 과거 급등 이벤트 백테스트
 # event_backtest.py를 미리 실행해서 만들어둔 event_backtest_<code>.json (같은 폴더)이 있을 때만 표시.
 # "하루 등락률+거래량이 동시에 크게 튄 날"을 호재/실적서프라이즈의 대리 지표로 삼아, 그 이후
@@ -2306,6 +2617,7 @@ def build_report(code, name, quote, annual, bars, daily_bars=None, investor_tren
     pbr_chart = f'<div class="gauge-title">PBR 추이 (과거 {n_months}개월)</div>' + line_chart_svg(history, 3, "PBR")
     export_corr_section = render_export_corr_section(code, bars)
     technical_section = render_technical_signal_section(daily_bars)
+    rebound_check_section = render_rebound_check_section(daily_bars)
     analyst_section = render_analyst_target_section(code, price)
     event_backtest_section = render_event_backtest_section(code, daily_bars)
     per_price_corr_section = render_per_price_correlation_section(history)
@@ -2324,6 +2636,7 @@ def build_report(code, name, quote, annual, bars, daily_bars=None, investor_tren
         per_gap=fmt_gap(cur_per, avg_per), pbr_gap=fmt_gap(cur_pbr, avg_pbr),
         per_gauge=per_gauge, pbr_gauge=pbr_gauge, per_chart=per_chart, pbr_chart=pbr_chart,
         export_corr_section=export_corr_section, technical_section=technical_section,
+        rebound_check_section=rebound_check_section,
         analyst_section=analyst_section, event_backtest_section=event_backtest_section,
         per_price_corr_section=per_price_corr_section, investor_flow_section=investor_flow_section,
         macro_section=macro_section, spike_investor_section=spike_investor_section,
